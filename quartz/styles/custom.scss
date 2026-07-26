@@ -1,3 +1,16 @@
-@use "./variables.scss" as *;
+/* ===== RTL FIX FOR ARABIC ===== */
+p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th {
+  unicode-bidi: plaintext;
+}
 
-// put your custom CSS here!
+/* Arabic callouts - force RTL */
+.callout-content p,
+.callout-title-inner {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+
+/* Article body */
+article .content p {
+  unicode-bidi: plaintext;
+}
