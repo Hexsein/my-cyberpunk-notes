@@ -38,3 +38,301 @@ article .content p {
   --border: #f59e0b;
   --bg: rgba(245, 158, 11, 0.1);
 }
+
+
+
+
+
+/* ═══════════════════════════════════════════════════════════════
+   HEXSEIN CYBERPUNK NOTES — Custom Stylesheet
+   File: quartz/styles/custom.scss
+   Theme: Dark Cyberpunk / HTB Hacker Dashboard
+   ═══════════════════════════════════════════════════════════════
+   HOW TO USE:
+   Open your project in VS Code, navigate to:
+   my-cyberpunk-notes/quartz/styles/custom.scss
+   and PASTE everything below at the end of that file.
+   ═══════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════
+   1. RTL FIX FOR ARABIC CONTENT
+   ═══════════════════════════════════════════════════════════════ */
+p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th {
+  unicode-bidi: plaintext;
+}
+
+.callout-content p,
+.callout-title-inner {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   2. OPERATIONAL CONSOLE DASHBOARD (the metadata table at top)
+   ═══════════════════════════════════════════════════════════════ */
+.op-console {
+  margin: 1.5rem 0 2rem;
+}
+
+.op-console table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(34, 197, 94, 0.025);
+  border: 1.5px solid rgba(34, 197, 94, 0.45);
+  border-radius: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  overflow: hidden;
+  box-shadow:
+    0 0 30px rgba(34, 197, 94, 0.12),
+    0 0 60px rgba(34, 197, 94, 0.05),
+    inset 0 0 40px rgba(34, 197, 94, 0.02);
+}
+
+.op-console td,
+.op-console th {
+  border: 1px solid rgba(34, 197, 94, 0.18);
+  padding: 10px 16px;
+  text-align: center;
+  color: #22c55e;
+}
+
+/* First row: site branding */
+.op-console tr:first-child td {
+  background: rgba(34, 197, 94, 0.10);
+  color: #4ade80;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+/* Label rows (even rows after first) */
+.op-console tr:nth-child(2) td,
+.op-console tr:nth-child(4) td,
+.op-console tr:nth-child(6) td {
+  background: rgba(34, 197, 94, 0.055);
+  color: #64748b;
+  font-size: 0.70rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 600;
+}
+
+/* Data rows (odd rows after first) */
+.op-console tr:nth-child(3) td,
+.op-console tr:nth-child(5) td,
+.op-console tr:nth-child(7) td {
+  background: rgba(11, 15, 25, 0.65);
+  color: #e2e8f0;
+}
+
+/* Inline code inside the console table */
+.op-console code {
+  background: rgba(34, 197, 94, 0.10) !important;
+  color: #4ade80 !important;
+  padding: 2px 8px !important;
+  border-radius: 4px !important;
+  font-family: 'IBM Plex Mono', monospace !important;
+  border: 1px solid rgba(34, 197, 94, 0.25) !important;
+  font-size: 0.87em !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   3. PHASE HEADERS (## h2) — LEFT-BORDERED TERMINAL STYLE
+   ═══════════════════════════════════════════════════════════════ */
+article .content h2 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #f8fafc;
+  border: none !important;
+  border-left: 3px solid #22c55e !important;
+  padding: 12px 0 12px 18px;
+  margin: 2.8rem 0 1.5rem;
+  background: linear-gradient(
+    to right,
+    rgba(34, 197, 94, 0.07) 0%,
+    rgba(34, 197, 94, 0.02) 50%,
+    transparent 100%
+  );
+  border-radius: 0 4px 4px 0;
+  box-shadow:
+    -3px 0 18px rgba(34, 197, 94, 0.25),
+    inset 0 0 20px rgba(34, 197, 94, 0.01);
+  text-shadow: 0 0 25px rgba(34, 197, 94, 0.25);
+  position: relative;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   4. HORIZONTAL RULES — GLOWING GREEN LINE
+   ═══════════════════════════════════════════════════════════════ */
+hr {
+  border: none !important;
+  height: 1px !important;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(34, 197, 94, 0.25) 10%,
+    rgba(34, 197, 94, 0.65) 50%,
+    rgba(34, 197, 94, 0.25) 90%,
+    transparent 100%
+  ) !important;
+  margin: 2.2rem 0 !important;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.3) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   5. CALLOUTS — THREE DISTINCT PHASE COLORS
+   ═══════════════════════════════════════════════════════════════ */
+/* PHASE I — Theory (green) */
+.callout[data-callout="tip"] {
+  --callout-color: 34, 197, 94;
+  border-left: 4px solid #22c55e !important;
+  background: rgba(34, 197, 94, 0.045) !important;
+}
+
+.callout[data-callout="tip"] .callout-title {
+  color: #22c55e !important;
+}
+
+/* PHASE II — Challenge (red/danger) */
+.callout[data-callout="danger"] {
+  --callout-color: 239, 68, 68;
+  border-left: 4px solid #ef4444 !important;
+  background: rgba(239, 68, 68, 0.045) !important;
+}
+
+.callout[data-callout="danger"] .callout-title {
+  color: #ef4444 !important;
+}
+
+/* PHASE III — Exploitation (amber) */
+.callout[data-callout="warning"] {
+  --callout-color: 245, 158, 11;
+  border-left: 4px solid #f59e0b !important;
+  background: rgba(245, 158, 11, 0.045) !important;
+}
+
+.callout[data-callout="warning"] .callout-title {
+  color: #f59e0b !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   6. CODE BLOCKS — DARK TERMINAL GLASS
+   ═══════════════════════════════════════════════════════════════ */
+pre {
+  background: rgba(8, 12, 22, 0.92) !important;
+  border: 1px solid rgba(34, 197, 94, 0.15) !important;
+  border-radius: 7px !important;
+}
+
+/* Plain / unlabeled code blocks (ASCII separators) */
+pre:not([class*="language-"]) {
+  border-left: 3px solid rgba(34, 197, 94, 0.45) !important;
+  box-shadow:
+    0 0 25px rgba(34, 197, 94, 0.08),
+    -3px 0 12px rgba(34, 197, 94, 0.12) !important;
+}
+
+pre:not([class*="language-"]) code {
+  color: rgba(34, 197, 94, 0.80) !important;
+  font-size: 0.77rem !important;
+  line-height: 1.65 !important;
+}
+
+/* PowerShell / bash / shell */
+pre[class*="language-powershell"] code,
+pre[class*="language-bash"] code,
+pre[class*="language-shell"] code,
+pre[class*="language-cmd"] code {
+  color: #e2e8f0 !important;
+  font-size: 0.85rem !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   7. INLINE CODE — CYBERPUNK CHIP STYLE
+   ═══════════════════════════════════════════════════════════════ */
+:not(pre) > code {
+  background: rgba(34, 197, 94, 0.09) !important;
+  color: #4ade80 !important;
+  border: 1px solid rgba(34, 197, 94, 0.22) !important;
+  border-radius: 4px !important;
+  padding: 1px 7px !important;
+  font-size: 0.88em !important;
+  font-family: 'IBM Plex Mono', monospace !important;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.10);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   8. TABLE OF CONTENTS SIDEBAR — TRACKING MONITOR FEEL
+   ═══════════════════════════════════════════════════════════════ */
+.toc ul li a {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.74rem;
+  letter-spacing: 0.03em;
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.toc ul li a:hover {
+  color: #22c55e !important;
+  text-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+  padding-left: 4px;
+}
+
+.toc ul li.active > a {
+  color: #22c55e !important;
+  font-weight: 700;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   9. TABLES (Cheat Sheets inside content)
+   ═══════════════════════════════════════════════════════════════ */
+article .content table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.83rem;
+}
+
+article .content table th {
+  background: rgba(34, 197, 94, 0.10);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  padding: 9px 14px;
+  text-align: left;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+article .content table td {
+  border: 1px solid rgba(34, 197, 94, 0.13);
+  padding: 8px 14px;
+  color: #cbd5e1;
+}
+
+article .content table tr:hover td {
+  background: rgba(34, 197, 94, 0.04);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   10. GRAPH VIEW NODES — GLOW ON HOVER
+   ═══════════════════════════════════════════════════════════════ */
+.graph-outer {
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.08);
+}
