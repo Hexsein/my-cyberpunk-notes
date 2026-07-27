@@ -12,4 +12,5 @@ title: الواجهة الرئيسية
 
 * [[HTB-Machine-1]]
 * [[HTB CPTS AD SEC 12 Internal Password Spraying - from Windows]]
+* [[Active-Directory-Sec12]]
 npx quartz sync
