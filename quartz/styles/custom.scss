@@ -14,3 +14,27 @@ p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th {
 article .content p {
   unicode-bidi: plaintext;
 }
+
+
+
+
+
+
+/* Custom Cybersecurity Callouts */
+.callout[data-callout="exploit"] {
+  --color: #ef4444;
+  --border: #ef4444;
+  --bg: rgba(239, 68, 68, 0.1);
+}
+
+.callout[data-callout="defense"] {
+  --color: #22c55e;
+  --border: #22c55e;
+  --bg: rgba(34, 197, 94, 0.1);
+}
+
+.callout[data-callout="flag"] {
+  --color: #f59e0b;
+  --border: #f59e0b;
+  --bg: rgba(245, 158, 11, 0.1);
+}
