@@ -14,6 +14,31 @@ tools: "[REPLACE — Tool1 · Tool2 · Tool3]"
 status: 🟢 Complete
 date: "[REPLACE — YYYY-MM-DD]"
 ---
+---
+title: "SEC [16]: Living Off the Land"
+module: "Active Directory Enumeration & Attacks"
+section_num: 16
+target: "INLANEFREIGHT.LOCAL"
+tags: ["CPTS", "Active Directory", "LOLBins"]
+difficulty: "Medium"
+vectors: ["LDAP", "WMI", "PowerShell", "CMD"]
+tools: ["dsquery", "wmic", "PowerShell", "net"]
+status: "Complete"
+date: "2026-07-28"
+---
+
+⚙️ HEXSEIN CYBERPUNK NOTES ✦ CPTS CERTIFICATION PATHWAY
+📍 TARGET NODE: INLANEFREIGHT.LOCAL
+🔐 ACCESS LEVEL: Low-Privilege Domain User
+📡 ATTACK VECTOR: LDAP / WMI / CMD
+📋 SECTION ID: SEC-16
+⚡ DIFFICULTY: 🟡 Medium
+🏁 STATUS: 🟢 ONLINE — COMPLETE
+🛠️ KEY TOOLS: PowerShell · dsquery · wmic · net
+🎯 CORE OBJECTIVE: Enumerate AD using native tools
+📅 DATE: 2026-07-28
+
+
 
 > [!abstract] ⚙️ HEXSEIN CYBERPUNK NOTES ✦ CPTS CERTIFICATION PATHWAY
 > **📍 TARGET NODE:** `[REPLACE: TARGET.DOMAIN.LOCAL]`
@@ -67,7 +92,7 @@ date: "[REPLACE — YYYY-MM-DD]"
 
 هذا بالضبط هو مفهوم الـ "Living Off the Land" (العيش على ما تنتجه الأرض) أو نختصرها بـ (LotL) في عالم الأمن السيبراني.
 
-ليش هذا الخلل أو هاي التقنية موجودة؟
+ليش هذا الخلل أو هاي التقنية موجودة؟⃁
 
 الشركات اليوم صارت ذكية، وصارت تنصب أنظمة مراقبة وحماية مرعبة مثل أنظمة كشف التسلل (IDS/IPS)، والجدران النارية (Firewalls)، والـ EDR (مثل CrowdStrike و Windows Defender). هاي الأنظمة مدربة تدريب قاسي إنها تصيد الأدوات الخبيثة. يعني أول ما ترفع أداة مثل BloodHound أو Mimikatz على سيرفر الضحية، الـ Antivirus راح يصرخ ويبلغ الـ Blue Team، وتنطرد من الشبكة بثواني.
 
