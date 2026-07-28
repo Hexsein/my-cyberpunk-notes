@@ -15,28 +15,7 @@ status: 🟢 Complete
 date: "[REPLACE — YYYY-MM-DD]"
 ---
 ---
-title: "SEC [16]: Living Off the Land"
-module: "Active Directory Enumeration & Attacks"
-section_num: 16
-target: "INLANEFREIGHT.LOCAL"
-tags: ["CPTS", "Active Directory", "LOLBins"]
-difficulty: "Medium"
-vectors: ["LDAP", "WMI", "PowerShell", "CMD"]
-tools: ["dsquery", "wmic", "PowerShell", "net"]
-status: "Complete"
-date: "2026-07-28"
----
 
-⚙️ HEXSEIN CYBERPUNK NOTES ✦ CPTS CERTIFICATION PATHWAY
-📍 TARGET NODE: INLANEFREIGHT.LOCAL
-🔐 ACCESS LEVEL: Low-Privilege Domain User
-📡 ATTACK VECTOR: LDAP / WMI / CMD
-📋 SECTION ID: SEC-16
-⚡ DIFFICULTY: 🟡 Medium
-🏁 STATUS: 🟢 ONLINE — COMPLETE
-🛠️ KEY TOOLS: PowerShell · dsquery · wmic · net
-🎯 CORE OBJECTIVE: Enumerate AD using native tools
-📅 DATE: 2026-07-28
 
 
 
