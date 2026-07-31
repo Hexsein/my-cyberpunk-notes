@@ -16,4 +16,5 @@ title: الواجهة الرئيسية
 * [[sec-17]]
 * [[sec-16]]
 * [[sec-18]]
+* [[sec-19]]
 npx quartz sync
