@@ -1,5 +1,5 @@
 ##### SEC-21: ACL Abuse: Kerberoasting via Fake SPN
-Module: Active Directory Privilege Escalation | Section: 1 | Target: INLANEFREIGHT.LOCAL
+Module: Active Directory Privilege Escalation | Section: 21 | Target: INLANEFREIGHT.LOCAL
 Tags: #CPTS #ActiveDirectory #Kerberoasting #ACLAabuse #FakeSPN | Difficulty: Medium | Status: 🟢 Complete
 
 ⚙ T4E · التقنية للجميع · CPTS CERTIFICATION PATHWAY
@@ -7,7 +7,7 @@ Tags: #CPTS #ActiveDirectory #Kerberoasting #ACLAabuse #FakeSPN | Difficulty: Me
 TARGET NODE: 10.129.84.16 (INLANEFREIGHT.LOCAL)
 ACCESS LEVEL: Authenticated User (Foothold)
 ATTACK VECTOR: ACL Abuse / Kerberos (TGS)
-SECTION ID: SEC-01
+SECTION ID: SEC-21
 KEY TOOLS: PowerView · Rubeus · Impacket · Hashcat
 DIFFICULTY: 🟡 Medium
 CORE OBJECTIVE: Weaponize GenericAll for Kerberoasting
