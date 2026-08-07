@@ -1,22 +1,34 @@
 
 ---
-title: "SEC-26: Miscellaneous Misconfigurations"
+title: "SEC-25: Bleeding Edge Vulnerabilities"
 module: "Active Directory Enumeration & Attacks"
-section_num: 26
+section_num: 25
 target: "INLANEFREIGHT.LOCAL"
 tags:
   - CPTS
   - ActiveDirectory
-  - Misconfigurations
-  - ASREPRoasting
-  - GPOAbuse
-  - PASSWD_NOTREQD
+  - NoPac
+  - PrintNightmare
+  - PetitPotam
+  - ADCS
 difficulty: "Medium"
-vectors: "Exchange ACLs · MS-PRN Printer Bug · Passwords in SYSVOL/GPP · AS-REP Roasting · GPO Abuse"
-tools: "PowerView · Rubeus · Impacket · Hashcat · adidnsdump · CrackMapExec · Kerbrute"
+vectors: "SamAccountName Spoofing · MS-RPRN Print Spooler · MS-EFSRPC / AD CS Relay"
+tools: "noPac · Impacket · CVE-2021-1675 · PetitPotam · PKINITtools · Rubeus · Mimikatz"
 status: "🟢 Complete"
 date: 2026-08-07
 ---
+
+> [!abstract] ⚙ T4E · التقنية للجميع · CPTS CERTIFICATION PATHWAY
+> 
+> |📍 TARGET NODE|🔐 ACCESS LEVEL|📡 ATTACK VECTOR|📋 SECTION ID|
+> |:-:|:-:|:-:|:-:|
+> |`INLANEFREIGHT.LOCAL`|`Unauthenticated / Authenticated Foothold`|`NoPac / PrintNightmare / PetitPotam`|`SEC-25`|
+> 
+> |🛠️ KEY TOOLS|⚡ DIFFICULTY|🎯 CORE OBJECTIVE|📅 DATE|
+> |:-:|:-:|:-:|:-:|
+> |`noPac · PetitPotam · Impacket · Rubeus · Mimikatz`|`🟡 Medium`|`Exploit Recent AD Vulnerabilities for Domain Admin`|`2026-08-07`|
+
+`PHASE_I: النظرية` → `PHASE_II: المختبر والطرق الستة` → `PHASE_III: الدليل والمصطلحات`
 
 > [!abstract] ⚙ T4E · التقنية للجميع · CPTS CERTIFICATION PATHWAY
 > 
